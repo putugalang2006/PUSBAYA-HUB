@@ -1,0 +1,545 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  BadgeCheck,
+  CalendarDays,
+  Download,
+  IdCard,
+  Lock,
+  MapPin,
+  QrCode as QrIcon,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+  Users,
+} from "lucide-react";
+import { toJpeg, toPng } from "html-to-image";
+import QRCode from "qrcode";
+import { useApp } from "@/context/AppContext";
+import type { Member, PageKey } from "@/lib/types";
+import {
+  cn,
+  formatDateShort,
+  initials,
+} from "@/lib/utils";
+import { LogoMark } from "@/components/ui/Logo";
+import { EmptyState } from "@/components/ui/EmptyState";
+
+export function KtaView({
+  onNavigate,
+}: {
+  onNavigate: (page: PageKey) => void;
+}) {
+  const { auth, members, pushToast, registeredMember } = useApp();
+  const isAdmin = auth?.role === "ADMIN";
+  const ownMember = registeredMember;
+
+  const [selectedId, setSelectedId] = useState("");
+
+  useEffect(() => {
+    if (members.length === 0) {
+      setSelectedId("");
+      return;
+    }
+    if (isAdmin) {
+      if (!members.some((member) => member.id === selectedId)) {
+        setSelectedId(members[0].id);
+      }
+    } else if (ownMember) {
+      setSelectedId(ownMember.id);
+    }
+  }, [isAdmin, members, ownMember, selectedId]);
+
+  const selected = useMemo(() => {
+    if (isAdmin) {
+      return members.find((member) => member.id === selectedId) ?? members[0];
+    }
+    if (ownMember) return ownMember;
+    return members.find((member) => member.id === selectedId);
+  }, [isAdmin, members, selectedId, ownMember]);
+
+  if (members.length === 0) {
+    return (
+      <div className="panel animate-fade-up">
+        <EmptyState
+          icon={IdCard}
+          title="Belum ada KTA digital"
+          description="Kartu Tanda Anggota akan dibuat otomatis untuk setiap anggota terdaftar, lengkap dengan ID unik dan QR verifikasi."
+          action={
+            <button
+              type="button"
+              onClick={() => onNavigate("dashboard")}
+              className="btn btn-gold"
+            >
+              <Users className="h-4 w-4" />
+              Daftarkan Anggota
+            </button>
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Selector */}
+      <section className="panel animate-fade-up p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-amber-400">
+              <IdCard className="h-[18px] w-[18px]" />
+            </span>
+            <div>
+              <h3 className="text-[13px] font-bold text-white">
+                {isAdmin ? "Pilih KTA Anggota" : "KTA Milik Anda"}
+              </h3>
+              <p className="mt-0.5 text-[10.5px] text-slate-500">
+                {isAdmin
+                  ? `${members.length} kartu tersedia untuk dicetak`
+                  : "Dimuat otomatis dari data registrasi akun Anda"}
+              </p>
+            </div>
+          </div>
+
+          {isAdmin ? (
+            <select
+              value={selected?.id ?? ""}
+              onChange={(event) => setSelectedId(event.target.value)}
+              className="field w-full py-2.5 text-xs sm:max-w-[380px]"
+              aria-label="Pilih anggota untuk KTA"
+            >
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.nama} · {member.id}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="badge badge-gold self-start sm:self-auto">
+              <ShieldCheck className="h-3 w-3" />
+              {ownMember ? "Terverifikasi" : "Belum Terhubung"}
+            </span>
+          )}
+        </div>
+      </section>
+
+      {!selected ? (
+        <section className="panel animate-fade-up" style={{ animationDelay: "80ms" }}>
+          <EmptyState
+            icon={UserRound}
+            title="KTA belum tersedia untuk akun ini"
+            description={`Username "${auth?.username ?? "Pengguna"}" belum terhubung ke data anggota. Selesaikan registrasi anggota di Dashboard untuk menerbitkan KTA Digital Anda secara otomatis.`}
+            action={
+              <button
+                type="button"
+                onClick={() => onNavigate("dashboard")}
+                className="btn btn-gold"
+              >
+                Ke Registrasi Anggota
+              </button>
+            }
+          />
+        </section>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+          <section
+            className="panel animate-fade-up flex flex-col items-center justify-center p-6 sm:p-10"
+            style={{ animationDelay: "80ms" }}
+          >
+            <div className="mb-5 flex w-full max-w-[560px] items-center justify-between">
+              <div>
+                <h3 className="text-[13px] font-bold text-white">
+                  Kartu Tanda Anggota
+                </h3>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                  Tampilan digital · siap diunduh
+                </p>
+              </div>
+              <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Aktif
+              </span>
+            </div>
+
+            <KtaCard
+              member={selected}
+              photo={
+                ownMember && selected.id === ownMember.id
+                  ? auth?.photo
+                  : undefined
+              }
+            />
+
+            <div className="mt-5 grid w-full max-w-[560px] grid-cols-1 gap-2 sm:grid-cols-2">
+              <DownloadButton member={selected} format="png" />
+              <DownloadButton member={selected} format="pdf" />
+              <div className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 sm:col-span-2">
+                <QrIcon className="h-4 w-4 shrink-0 text-amber-400/70" />
+                <p className="text-[10px] leading-relaxed text-slate-500">
+                  QR berisi identitas anggota untuk verifikasi kehadiran sangkep.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Detail */}
+          <section
+            className="panel animate-fade-up p-5"
+            style={{ animationDelay: "140ms" }}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-amber-400">
+                <BadgeCheck className="h-[18px] w-[18px]" />
+              </span>
+              <div>
+                <h3 className="text-[13px] font-bold text-white">
+                  Detail Keanggotaan
+                </h3>
+                <p className="text-[10px] text-slate-500">
+                  Data resmi anggota terdaftar
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-1">
+              <DetailRow label="Nama Lengkap" value={selected.nama} />
+              <DetailRow label="ID Anggota" value={selected.id} mono />
+              <DetailRow label="Tempekan" value={selected.tempekan} />
+              <DetailRow label="Status" value={selected.status} />
+              <DetailRow label="Kategori Usia" value={selected.usia} />
+              <DetailRow
+                label="Terdaftar"
+                value={formatDateShort(selected.createdAt.slice(0, 10))}
+              />
+              <DetailRow label="Nomor WhatsApp" value={selected.whatsapp} mono />
+              <DetailRow label="Masa Berlaku" value="31 Desember 2026" />
+            </div>
+
+            <div className="mt-5 rounded-xl border border-amber-400/15 bg-amber-400/[0.04] p-3.5">
+              <div className="flex items-start gap-2.5">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-400/80" />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-300/80">
+                    Kartu Resmi Organisasi
+                  </p>
+                  <p className="mt-1 text-[10.5px] leading-relaxed text-slate-400">
+                    KTA ini diterbitkan oleh ST Putra Settu Bhakti Jaya, Banjar
+                    Campuan. Gunakan dengan bertanggung jawab.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-white/[0.06] bg-black/20 px-3.5 py-3">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-600">
+                  Kelengkapan Profil
+                </p>
+                <p className="mt-0.5 text-[10px] text-slate-500">
+                  Nama, ID, tempekan & QR
+                </p>
+              </div>
+              <span className="font-mono text-[13px] font-bold text-emerald-400">
+                100%
+              </span>
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-white/[0.045] py-2.5 last:border-none">
+      <span className="text-[10.5px] font-medium uppercase tracking-wider text-slate-500">
+        {label}
+      </span>
+      <span
+        className={cn(
+          "max-w-[60%] break-words text-right text-[11.5px] font-semibold text-slate-200",
+          mono && "font-mono text-[10.5px] tracking-wide text-amber-300/90",
+        )}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function KtaCard({ member, photo }: { member: Member; photo?: string }) {
+  const [qr, setQr] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const payload = [
+      "PUSBAYA HUB",
+      `ID:${member.id}`,
+      `NAMA:${member.nama}`,
+      `TEMPEKAN:${member.tempekan}`,
+      "ST PUTRA SETTU BHAKTI JAYA",
+    ].join("|");
+    QRCode.toDataURL(payload, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 240,
+      color: { dark: "#0b0b0b", light: "#ffffff" },
+    })
+      .then((url) => {
+        if (!cancelled) setQr(url);
+      })
+      .catch(() => {
+        if (!cancelled) setQr("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [member]);
+
+  return (
+    <div
+      id="kta-card-node"
+      className="kta-shell relative aspect-[1.58/1] w-full max-w-[560px] overflow-hidden rounded-2xl px-5 py-4 sm:px-7 sm:py-5"
+    >
+      <div className="kta-shine" />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.05]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, #facc15 1px, transparent 0)",
+          backgroundSize: "18px 18px",
+        }}
+      />
+      <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full border border-amber-400/10" />
+      <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full border border-amber-400/10" />
+      <LogoMark
+        size={260}
+        className="pointer-events-none absolute -bottom-24 -left-16 opacity-[0.045]"
+      />
+
+      <div className="relative flex h-full flex-col justify-between">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <LogoMark size={40} />
+            <div>
+              <p className="text-[13px] font-extrabold uppercase leading-none tracking-[0.12em]">
+                <span className="gold-text">Pusbaya Hub</span>
+              </p>
+              <p className="mt-1.5 text-[6.5px] font-semibold uppercase tracking-[0.18em] text-amber-200/50 sm:text-[7.5px]">
+                ST Putra Settu Bhakti Jaya · Banjar Campuan
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-[7px] font-bold uppercase tracking-[0.2em] text-amber-300/60">
+              Kartu Tanda
+            </p>
+            <p className="text-[7px] font-bold uppercase tracking-[0.2em] text-amber-300/60">
+              Anggota
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 sm:gap-4">
+          <div className="relative shrink-0">
+            <div className="absolute inset-0 rounded-full bg-amber-400/20 blur-xl" />
+            <div className="relative flex h-[56px] w-[56px] items-center justify-center overflow-hidden rounded-full border-2 border-amber-400/50 bg-gradient-to-b from-amber-400/25 to-amber-900/20 sm:h-[74px] sm:w-[74px]">
+              {photo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photo}
+                  alt={`Foto ${member.nama}`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-xl font-extrabold tracking-wide text-amber-200 sm:text-2xl">
+                  {initials(member.nama)}
+                </span>
+              )}
+            </div>
+            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-amber-400/40 bg-[#12100a] text-amber-400">
+              <ShieldCheck className="h-3 w-3" />
+            </span>
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="line-clamp-2 text-[13px] font-extrabold leading-[1.15] text-white sm:line-clamp-1 sm:text-[19px]">
+              {member.nama}
+            </p>
+            <p className="mt-1 font-mono text-[9px] font-bold tracking-[0.16em] text-amber-300/90 sm:text-[10.5px]">
+              {member.id}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[6.5px] font-bold uppercase tracking-[0.1em] text-amber-200 sm:text-[7.5px]">
+                <MapPin className="h-2 w-2" />
+                {member.tempekan}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[6.5px] font-bold uppercase tracking-[0.1em] text-slate-300 sm:text-[7.5px]">
+                <BadgeCheck className="h-2 w-2" />
+                {member.status}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-col items-center">
+            <div className="rounded-lg bg-white p-1 shadow-lg shadow-black/40 sm:p-1.5">
+              {qr ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={qr}
+                  alt={`QR KTA ${member.nama}`}
+                  className="h-[40px] w-[40px] sm:h-[58px] sm:w-[58px]"
+                />
+              ) : (
+                <div className="flex h-[40px] w-[40px] items-center justify-center bg-slate-100 sm:h-[58px] sm:w-[58px]">
+                  <QrIcon className="h-5 w-5 text-slate-400 sm:h-6 sm:w-6" />
+                </div>
+              )}
+            </div>
+            <p className="mt-1 text-[5.5px] font-bold uppercase tracking-[0.14em] text-amber-200/50">
+              Scan Verifikasi
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-end justify-between gap-3 border-t border-amber-400/15 pt-2.5">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div>
+              <p className="text-[5.5px] font-bold uppercase tracking-[0.18em] text-amber-200/40 sm:text-[6.5px]">
+                Bergabung
+              </p>
+              <p className="mt-0.5 flex items-center gap-1 font-mono text-[7.5px] font-semibold text-slate-300 sm:text-[8.5px]">
+                <CalendarDays className="h-2 w-2 text-amber-400/60" />
+                {formatDateShort(member.createdAt.slice(0, 10))}
+              </p>
+            </div>
+            <div>
+              <p className="text-[5.5px] font-bold uppercase tracking-[0.18em] text-amber-200/40 sm:text-[6.5px]">
+                Masa Berlaku
+              </p>
+              <p className="mt-0.5 font-mono text-[7.5px] font-semibold text-slate-300 sm:text-[8.5px]">
+                31 · 12 · 2026
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 text-[5.5px] font-bold uppercase tracking-[0.16em] text-amber-300/40 sm:text-[6.5px]">
+            <Sparkles className="h-2 w-2" />
+            Banjar Campuan · Kerobokan
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DownloadButton({
+  member,
+  format,
+}: {
+  member: Member;
+  format: "png" | "pdf";
+}) {
+  const { pushToast } = useApp();
+  const [downloading, setDownloading] = useState(false);
+  const isPng = format === "png";
+  const safeName = member.nama.replace(/\s+/g, "-");
+
+  const handleDownload = async () => {
+    const node = document.getElementById("kta-card-node");
+    if (!node) return;
+    setDownloading(true);
+    try {
+      const dataUrl = isPng
+        ? await toPng(node, {
+            cacheBust: true,
+            pixelRatio: 3,
+            backgroundColor: "#0a0b0e",
+            width: node.clientWidth,
+            height: node.clientHeight,
+          })
+        : await toJpeg(node, {
+            cacheBust: true,
+            pixelRatio: 2,
+            quality: 0.95,
+            backgroundColor: "#0a0b0e",
+            width: node.clientWidth,
+            height: node.clientHeight,
+          });
+
+      if (isPng) {
+        const link = document.createElement("a");
+        link.download = `KTA-${member.id}-${safeName}.png`;
+        link.href = dataUrl;
+        link.click();
+      } else {
+        const { jsPDF } = await import("jspdf");
+        const pdf = new jsPDF({
+          orientation: "landscape",
+          unit: "mm",
+          format: "a4",
+        });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 12;
+        const ratio = Math.min(
+          (pageWidth - margin * 2) / node.clientWidth,
+          (pageHeight - margin * 2) / node.clientHeight,
+        );
+        const width = node.clientWidth * ratio;
+        const height = node.clientHeight * ratio;
+        pdf.addImage(
+          dataUrl,
+          "JPEG",
+          (pageWidth - width) / 2,
+          (pageHeight - height) / 2,
+          width,
+          height,
+        );
+        pdf.save(`KTA-${member.id}-${safeName}.pdf`);
+      }
+
+      pushToast(
+        "success",
+        "KTA berhasil diunduh",
+        `Kartu ${member.nama} tersimpan sebagai ${isPng ? "PNG" : "PDF"}.`,
+      );
+    } catch {
+      pushToast(
+        "error",
+        `Gagal mengunduh KTA ${isPng ? "PNG" : "PDF"}`,
+        "Coba lagi atau gunakan browser lain.",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleDownload}
+      disabled={downloading}
+      className={cn(
+        "btn py-2.5",
+        isPng ? "btn-gold" : "btn-outline",
+      )}
+    >
+      <Download className={cn("h-4 w-4", downloading && "animate-pulse")} />
+      {downloading
+        ? `Menyiapkan ${isPng ? "PNG" : "PDF"}…`
+        : isPng
+          ? "Unduh KTA (PNG)"
+          : "Unduh PDF"}
+    </button>
+  );
+}
