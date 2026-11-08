@@ -9,16 +9,11 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  ADMIN_PASSWORD,
-  ADMIN_USERNAME,
-  STORAGE_KEYS,
-  TEMPEKAN_LIST,
-} from "@/lib/constants";
+import { ADMIN_USERNAME, STORAGE_KEYS, TEMPEKAN_LIST } from "@/lib/constants";
 import {
   findMemberForAuth,
-  nextMemberSequence,
   memberCode,
+  nextMemberSequence,
   todayInput,
   uid,
 } from "@/lib/utils";
@@ -32,6 +27,17 @@ import type {
   ToastMessage,
   UserAccount,
 } from "@/lib/types";
+import { isSupabaseConfigured, SUPABASE_CONFIG_ERROR } from "@/lib/supabase";
+import {
+  deleteMemberRecord,
+  fetchMembersFromDb,
+  fetchUserByUsername,
+  insertMember,
+  insertUser,
+  updateMemberRecord,
+  uploadProfilePhoto,
+  usernameExists,
+} from "@/lib/supabaseData";
 import {
   readStorage,
   useLocalStorageState,
@@ -45,19 +51,22 @@ interface LoginResult {
 interface AppContextValue {
   auth: AuthUser | null;
   hydrated: boolean;
-  accounts: UserAccount[];
-  login: (username: string, role: Role, password?: string) => LoginResult;
+  login: (
+    username: string,
+    role: Role,
+    password?: string,
+  ) => Promise<LoginResult>;
   registerAccount: (input: {
     username: string;
     password: string;
     photo?: string;
-  }) => LoginResult;
+  }) => Promise<LoginResult>;
   logout: () => void;
 
   members: Member[];
-  addMember: (input: MemberInput) => Member | null;
-  updateMember: (id: string, input: MemberInput) => void;
-  deleteMember: (id: string) => void;
+  addMember: (input: MemberInput) => Promise<Member | null>;
+  updateMember: (id: string, input: MemberInput) => Promise<boolean>;
+  deleteMember: (id: string) => Promise<boolean>;
   registeredMember: Member | undefined;
   isRegistered: boolean;
 
@@ -75,7 +84,7 @@ interface AppContextValue {
   ) => void;
 
   online: boolean;
-  refresh: () => void;
+  refresh: () => Promise<void>;
   refreshing: boolean;
   lastSyncedAt: string;
 
@@ -90,34 +99,37 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function syncedTime(): string {
+  return new Date().toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [auth, setAuth, authHydrated] = useLocalStorageState<AuthUser | null>(
     STORAGE_KEYS.auth,
     null,
   );
-  const [accounts, setAccounts, accountsHydrated] = useLocalStorageState<
-    UserAccount[]
-  >(STORAGE_KEYS.accounts, []);
-  const [members, setMembers, membersHydrated] = useLocalStorageState<Member[]>(
-    STORAGE_KEYS.members,
-    [],
-  );
+  const [members, setMembers] = useState<Member[]>([]);
   const [sessions, setSessions, sessionsHydrated] = useLocalStorageState<
     AttendanceSession[]
   >(STORAGE_KEYS.sessions, []);
 
-  const hydrated =
-    authHydrated &&
-    accountsHydrated &&
-    membersHydrated &&
-    sessionsHydrated;
-
+  const [bootstrapped, setBootstrapped] = useState(false);
   const [online, setOnline] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState("");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const registrationLock = useRef(false);
+  const authRef = useRef(auth);
+
+  const hydrated = authHydrated && sessionsHydrated && bootstrapped;
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
@@ -140,6 +152,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const reportSupabaseError = useCallback(
+    (context: string, error: unknown) => {
+      const message = errorText(error);
+      window.alert(`${context}: ${message}`);
+      pushToast("error", context, message);
+      return message;
+    },
+    [pushToast],
+  );
+
+  const loadMembers = useCallback(async (): Promise<Member[]> => {
+    const data = await fetchMembersFromDb();
+    setMembers(data);
+    setLastSyncedAt(syncedTime());
+    return data;
+  }, []);
+
+  useEffect(() => {
+    authRef.current = auth;
+  }, [auth]);
+
   useEffect(() => {
     setOnline(navigator.onLine);
     const goOnline = () => {
@@ -158,65 +191,73 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [pushToast]);
 
+  // Restore the saved auth session only after verifying it against Supabase,
+  // then load every member row from the database.
   useEffect(() => {
-    setLastSyncedAt(
-      new Date().toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    );
-  }, []);
+    if (!authHydrated) return;
+    let cancelled = false;
 
-  // Invalidate sessions created before the username/password auth upgrade.
-  useEffect(() => {
-    if (!hydrated || !auth) return;
-    if (typeof auth.username !== "string" || !auth.username) {
-      setAuth(null);
-    }
-  }, [hydrated, auth, setAuth]);
+    const bootstrap = async () => {
+      try {
+        if (!isSupabaseConfigured) throw new Error(SUPABASE_CONFIG_ERROR);
 
-  // Keep tabs in sync when another tab writes to localStorage.
+        const dbMembers = await fetchMembersFromDb();
+        if (cancelled) return;
+        setMembers(dbMembers);
+        setLastSyncedAt(syncedTime());
+
+        const currentAuth = authRef.current;
+        if (currentAuth?.username) {
+          const dbUser = await fetchUserByUsername(currentAuth.username);
+          if (cancelled) return;
+          if (!dbUser) {
+            setAuth(null);
+          } else {
+            setAuth({
+              userId: dbUser.id,
+              username: dbUser.username,
+              name: dbUser.username,
+              role: dbUser.role,
+              photo: dbUser.photo,
+              loginAt: currentAuth.loginAt || new Date().toISOString(),
+            });
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const message = errorText(error);
+          pushToast("error", "Gagal terhubung ke Supabase", message);
+        }
+      } finally {
+        if (!cancelled) setBootstrapped(true);
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, [authHydrated, pushToast, setAuth]);
+
+  // Keep attendance sessions in sync between tabs while auth and members
+  // always come from Supabase.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (!event.key) return;
-      if (event.key === STORAGE_KEYS.accounts) {
-        setAccounts(readStorage<UserAccount[]>(STORAGE_KEYS.accounts, []));
-      }
-      if (event.key === STORAGE_KEYS.members) {
-        setMembers(readStorage<Member[]>(STORAGE_KEYS.members, []));
-      }
       if (event.key === STORAGE_KEYS.sessions) {
         setSessions(readStorage<AttendanceSession[]>(STORAGE_KEYS.sessions, []));
       }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [setAccounts, setMembers, setSessions]);
+  }, [setSessions]);
 
   const login = useCallback(
-    (username: string, role: Role, password?: string): LoginResult => {
-      const identifier = username.trim();
-
-      if (role === "ADMIN") {
-        if (
-          identifier.toLowerCase() !== ADMIN_USERNAME ||
-          password !== ADMIN_PASSWORD
-        ) {
-          return {
-            ok: false,
-            error: "Username atau Password Admin salah!",
-          };
-        }
-        setAuth({
-          userId: "admin",
-          username: ADMIN_USERNAME,
-          name: "Admin PUSBAYA",
-          role: "ADMIN",
-          loginAt: new Date().toISOString(),
-        });
-        return { ok: true };
-      }
-
+    async (
+      username: string,
+      role: Role,
+      password?: string,
+    ): Promise<LoginResult> => {
+      const identifier = username.trim().toLowerCase();
       if (!identifier || !password) {
         return {
           ok: false,
@@ -224,36 +265,62 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const account = accounts.find(
-        (item) => item.username.toLowerCase() === identifier.toLowerCase(),
-      );
-      if (!account || account.password !== password) {
+      try {
+        const user = await fetchUserByUsername(identifier);
+        if (!user || user.password !== password) {
+          return {
+            ok: false,
+            error: "Username atau password salah.",
+          };
+        }
+        if (role === "ADMIN" && user.role !== "ADMIN") {
+          return {
+            ok: false,
+            error: "Akun ini tidak memiliki akses Admin.",
+          };
+        }
+        if (role === "PENGGUNA" && user.role === "ADMIN") {
+          return {
+            ok: false,
+            error: "Akun Admin harus masuk melalui tab Admin.",
+          };
+        }
+
+        setAuth({
+          userId: user.id,
+          username: user.username,
+          name: user.username,
+          role: user.role,
+          photo: user.photo,
+          loginAt: new Date().toISOString(),
+        });
+
+        try {
+          await loadMembers();
+        } catch (error) {
+          reportSupabaseError("Gagal mengambil data anggota dari Supabase", error);
+        }
+        return { ok: true };
+      } catch (error) {
         return {
           ok: false,
-          error: "Username atau password salah.",
+          error: reportSupabaseError(
+            "Gagal memverifikasi login ke Supabase",
+            error,
+          ),
         };
       }
-
-      setAuth({
-        userId: account.id,
-        username: account.username,
-        name: account.username,
-        role: "PENGGUNA",
-        photo: account.photo,
-        loginAt: new Date().toISOString(),
-      });
-      return { ok: true };
     },
-    [accounts, setAuth],
+    [loadMembers, reportSupabaseError, setAuth],
   );
 
   const registerAccount = useCallback(
-    (input: {
+    async (input: {
       username: string;
       password: string;
       photo?: string;
-    }): LoginResult => {
-      const username = input.username.trim();
+    }): Promise<LoginResult> => {
+      const username = input.username.trim().toLowerCase();
       if (username.length < 3) {
         return {
           ok: false,
@@ -278,50 +345,86 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           error: "Password minimal 6 karakter.",
         };
       }
-      const taken = accounts.some(
-        (account) => account.username.toLowerCase() === username.toLowerCase(),
-      );
-      if (taken || username.toLowerCase() === ADMIN_USERNAME) {
+
+      try {
+        const taken = await usernameExists(username);
+        if (taken || username === ADMIN_USERNAME) {
+          return {
+            ok: false,
+            error: "Username sudah digunakan. Pilih username lain.",
+          };
+        }
+
+        let photoUrl: string | undefined;
+        if (input.photo) {
+          try {
+            photoUrl = await uploadProfilePhoto(input.photo, username);
+          } catch (error) {
+            return {
+              ok: false,
+              error: reportSupabaseError(
+                "Gagal mengunggah foto ke Supabase",
+                error,
+              ),
+            };
+          }
+        }
+
+        let account: UserAccount;
+        try {
+          account = await insertUser({
+            username,
+            password: input.password,
+            photoUrl,
+          });
+        } catch (error) {
+          return {
+            ok: false,
+            error: reportSupabaseError("Gagal menyimpan ke Supabase", error),
+          };
+        }
+
+        setAuth({
+          userId: account.id,
+          username: account.username,
+          name: account.username,
+          role: "PENGGUNA",
+          photo: account.photo,
+          loginAt: new Date().toISOString(),
+        });
+
+        try {
+          await loadMembers();
+        } catch (error) {
+          reportSupabaseError("Gagal mengambil data anggota dari Supabase", error);
+        }
+        return { ok: true };
+      } catch (error) {
         return {
           ok: false,
-          error: "Username sudah digunakan. Pilih username lain.",
+          error: reportSupabaseError("Gagal menyimpan ke Supabase", error),
         };
       }
-
-      const account: UserAccount = {
-        id: uid("acc"),
-        username,
-        password: input.password,
-        photo: input.photo,
-        createdAt: new Date().toISOString(),
-      };
-      setAccounts((prev) => [...prev, account]);
-      setAuth({
-        userId: account.id,
-        username: account.username,
-        name: account.username,
-        role: "PENGGUNA",
-        photo: account.photo,
-        loginAt: new Date().toISOString(),
-      });
-      return { ok: true };
     },
-    [accounts, setAccounts, setAuth],
+    [loadMembers, reportSupabaseError, setAuth],
   );
 
   const logout = useCallback(() => {
     setAuth(null);
+    setMembers([]);
     pushToast("info", "Anda telah keluar", "Sesi login berhasil diakhiri.");
-  }, [setAuth, pushToast]);
+  }, [pushToast, setAuth]);
 
   const addMember = useCallback(
-    (input: MemberInput): Member | null => {
+    async (input: MemberInput): Promise<Member | null> => {
+      if (!auth) {
+        pushToast("error", "Sesi tidak ditemukan", "Silakan login ulang.");
+        return null;
+      }
+
       const linkedMember = findMemberForAuth(members, auth);
 
-      // Business rule: one user account may only register one member record.
-      // The transient lock also blocks same-tick double submits before the
-      // first state update has rendered.
-      if (auth?.role === "PENGGUNA") {
+      if (auth.role === "PENGGUNA") {
         if (linkedMember) {
           pushToast(
             "error",
@@ -337,74 +440,87 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }, 0);
       }
 
-      const linkedAccount =
-        auth?.role === "PENGGUNA"
-          ? accounts.find(
-              (account) =>
-                account.username.toLowerCase() ===
-                auth.username.toLowerCase(),
-            )
-          : undefined;
+      const id = memberCode(nextMemberSequence(members.map((m) => m.id)));
 
-      const now = new Date().toISOString();
-      const member: Member = {
-        id: memberCode(nextMemberSequence(members.map((m) => m.id))),
-        userId:
-          auth?.role === "PENGGUNA"
-            ? (auth.userId ?? linkedAccount?.id ?? auth.username)
-            : undefined,
-        username:
-          auth?.role === "PENGGUNA" ? auth.username : undefined,
-        nama: input.nama.trim(),
-        alamat: input.alamat.trim(),
-        whatsapp: input.whatsapp.trim(),
-        tempekan: TEMPEKAN_LIST.includes(input.tempekan)
-          ? input.tempekan
-          : TEMPEKAN_LIST[0],
-        status: input.status,
-        usia: input.usia,
-        createdAt: now,
-      };
-      setMembers((prev) => [...prev, member]);
-      return member;
+      try {
+        const created = await insertMember({
+          id,
+          userId: auth.role === "PENGGUNA" ? auth.userId : undefined,
+          username: auth.role === "PENGGUNA" ? auth.username : undefined,
+          data: {
+            nama: input.nama.trim(),
+            alamat: input.alamat.trim(),
+            whatsapp: input.whatsapp.trim(),
+            tempekan: TEMPEKAN_LIST.includes(input.tempekan)
+              ? input.tempekan
+              : TEMPEKAN_LIST[0],
+            status: input.status,
+            usia: input.usia,
+          },
+        });
+
+        setMembers((prev) => [...prev, created]);
+        setLastSyncedAt(syncedTime());
+        return created;
+      } catch (error) {
+        reportSupabaseError("Gagal menyimpan ke Supabase", error);
+        return null;
+      } finally {
+        if (auth.role === "PENGGUNA") {
+          window.setTimeout(() => {
+            registrationLock.current = false;
+          }, 0);
+        }
+      }
     },
-    [accounts, auth, members, pushToast, setMembers],
+    [auth, members, pushToast, reportSupabaseError],
   );
 
   const updateMember = useCallback(
-    (id: string, input: MemberInput) => {
-      setMembers((prev) =>
-        prev.map((member) =>
-          member.id === id
-            ? {
-                ...member,
-                nama: input.nama.trim(),
-                alamat: input.alamat.trim(),
-                whatsapp: input.whatsapp.trim(),
-                tempekan: input.tempekan,
-                status: input.status,
-                usia: input.usia,
-              }
-            : member,
-        ),
-      );
+    async (id: string, input: MemberInput): Promise<boolean> => {
+      try {
+        const updated = await updateMemberRecord(id, {
+          nama: input.nama.trim(),
+          alamat: input.alamat.trim(),
+          whatsapp: input.whatsapp.trim(),
+          tempekan: input.tempekan,
+          status: input.status,
+          usia: input.usia,
+        });
+        setMembers((prev) =>
+          prev.map((member) => (member.id === id ? updated : member)),
+        );
+        setLastSyncedAt(syncedTime());
+        return true;
+      } catch (error) {
+        reportSupabaseError("Gagal memperbarui data di Supabase", error);
+        return false;
+      }
     },
-    [setMembers],
+    [reportSupabaseError],
   );
 
   const deleteMember = useCallback(
-    (id: string) => {
-      setMembers((prev) => prev.filter((member) => member.id !== id));
-      setSessions((prev) =>
-        prev.map((session) => {
-          if (!(id in session.records)) return session;
-          const records = { ...session.records };
-          delete records[id];
-          return { ...session, records };
-        }),
-      );
+    async (id: string): Promise<boolean> => {
+      try {
+        await deleteMemberRecord(id);
+        setMembers((prev) => prev.filter((member) => member.id !== id));
+        setSessions((prev) =>
+          prev.map((session) => {
+            if (!(id in session.records)) return session;
+            const records = { ...session.records };
+            delete records[id];
+            return { ...session, records };
+          }),
+        );
+        setLastSyncedAt(syncedTime());
+        return true;
+      } catch (error) {
+        reportSupabaseError("Gagal menghapus data dari Supabase", error);
+        return false;
+      }
     },
-    [setMembers, setSessions],
+    [reportSupabaseError, setSessions],
   );
 
   const createSession = useCallback(
@@ -452,21 +568,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [setSessions],
   );
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     setRefreshing(true);
-    setMembers(readStorage<Member[]>(STORAGE_KEYS.members, []));
-    setSessions(readStorage<AttendanceSession[]>(STORAGE_KEYS.sessions, []));
-    window.setTimeout(() => {
-      setRefreshing(false);
-      setLastSyncedAt(
-        new Date().toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+    try {
+      await loadMembers();
+      pushToast(
+        "success",
+        "Data disegarkan",
+        "Data anggota berhasil dimuat ulang dari Supabase.",
       );
-      pushToast("success", "Data disegarkan", "Sinkronisasi data lokal selesai.");
-    }, 700);
-  }, [setMembers, setSessions, pushToast]);
+    } catch (error) {
+      reportSupabaseError("Gagal mengambil data dari Supabase", error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadMembers, pushToast, reportSupabaseError]);
 
   const registeredMember = useMemo(
     () => findMemberForAuth(members, auth),
@@ -478,7 +594,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     () => ({
       auth,
       hydrated,
-      accounts,
       login,
       registerAccount,
       logout,
@@ -503,7 +618,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [
       auth,
       hydrated,
-      accounts,
       login,
       registerAccount,
       logout,

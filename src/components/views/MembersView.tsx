@@ -428,15 +428,16 @@ export function MembersView({
         <MemberForm
           submitLabel="Simpan Anggota"
           onCancel={() => setAddOpen(false)}
-          onSubmit={(input) => {
-            const created = addMember(input);
-            if (!created) return;
+          onSubmit={async (input) => {
+            const created = await addMember(input);
+            if (!created) return false;
             setAddOpen(false);
             pushToast(
               "success",
               "Anggota ditambahkan",
               `${created.nama} · ${created.id}`,
             );
+            return true;
           }}
         />
       </Modal>
@@ -453,10 +454,12 @@ export function MembersView({
             initial={editing}
             submitLabel="Simpan Perubahan"
             onCancel={() => setEditing(null)}
-            onSubmit={(input) => {
-              updateMember(editing.id, input);
+            onSubmit={async (input) => {
+              const updated = await updateMember(editing.id, input);
+              if (!updated) return false;
               setEditing(null);
               pushToast("success", "Data anggota diperbarui", input.nama);
+              return true;
             }}
           />
         )}
@@ -472,11 +475,13 @@ export function MembersView({
             : ""
         }
         confirmLabel="Ya, Hapus"
-        onConfirm={() => {
-          if (!deleting) return;
-          deleteMember(deleting.id);
+        onConfirm={async () => {
+          if (!deleting) return false;
+          const removed = await deleteMember(deleting.id);
+          if (!removed) return false;
           pushToast("info", "Anggota dihapus", deleting.nama);
           setDeleting(null);
+          return true;
         }}
       />
     </div>

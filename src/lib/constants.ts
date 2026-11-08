@@ -6,7 +6,6 @@ export const APP_SUBTITLE =
 export const ST_NAME =
   "Sekaa Teruna Putra Settu Bhakti Jaya, Banjar Campuan, Desa Adat Kerobokan";
 export const ADMIN_USERNAME = "adminpusbaya";
-export const ADMIN_PASSWORD = "pusbaya1974";
 
 export const TEMPEKAN_LIST: Tempekan[] = [
   "Tempek Kauh Kelod",
@@ -35,8 +34,6 @@ export const WA_BLAST_TARGETS = [
 export const STORAGE_PREFIX = "pusbaya_hub_v1";
 export const STORAGE_KEYS = {
   auth: `${STORAGE_PREFIX}_auth`,
-  accounts: `${STORAGE_PREFIX}_accounts`,
-  members: `${STORAGE_PREFIX}_members`,
   sessions: `${STORAGE_PREFIX}_sessions`,
 } as const;
 

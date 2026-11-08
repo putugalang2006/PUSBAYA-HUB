@@ -52,6 +52,7 @@ export function LoginScreen({
   const [showPassword, setShowPassword] = useState(false);
   const [photo, setPhoto] = useState("");
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -91,48 +92,54 @@ export function LoginScreen({
     }
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     setError("");
+    setSubmitting(true);
 
-    if (role === "ADMIN") {
-      const result = login(username, "ADMIN", password);
+    try {
+      if (role === "ADMIN") {
+        const result = await login(username, "ADMIN", password);
+        if (!result.ok) {
+          setError(result.error ?? "Username atau Password Admin salah!");
+          return;
+        }
+        onSuccess();
+        return;
+      }
+
+      if (mode === "register") {
+        if (username.trim().length < 3) {
+          setError("Username minimal 3 karakter.");
+          return;
+        }
+        if (password.length < 6) {
+          setError("Password minimal 6 karakter.");
+          return;
+        }
+        const result = await registerAccount({
+          username,
+          password,
+          photo: photo || undefined,
+        });
+        if (!result.ok) {
+          setError(result.error ?? "Registrasi gagal. Coba lagi.");
+          return;
+        }
+        onSuccess();
+        return;
+      }
+
+      const result = await login(username, "PENGGUNA", password);
       if (!result.ok) {
-        setError(result.error ?? "Username atau Password Admin salah!");
+        setError(result.error ?? "Username atau password salah.");
         return;
       }
       onSuccess();
-      return;
+    } finally {
+      setSubmitting(false);
     }
-
-    if (mode === "register") {
-      if (username.trim().length < 3) {
-        setError("Username minimal 3 karakter.");
-        return;
-      }
-      if (password.length < 6) {
-        setError("Password minimal 6 karakter.");
-        return;
-      }
-      const result = registerAccount({
-        username,
-        password,
-        photo: photo || undefined,
-      });
-      if (!result.ok) {
-        setError(result.error ?? "Registrasi gagal. Coba lagi.");
-        return;
-      }
-      onSuccess();
-      return;
-    }
-
-    const result = login(username, "PENGGUNA", password);
-    if (!result.ok) {
-      setError(result.error ?? "Username atau password salah.");
-      return;
-    }
-    onSuccess();
   };
 
   const cardTitle =
@@ -429,9 +436,16 @@ export function LoginScreen({
 
                   <button
                     type="submit"
-                    className="btn btn-gold group mt-1 w-full py-3 text-[13px]"
+                    disabled={submitting || photoBusy}
+                    aria-busy={submitting}
+                    className="btn btn-gold group mt-1 w-full py-3 text-[13px] disabled:cursor-wait disabled:opacity-75"
                   >
-                    {role === "ADMIN" ? (
+                    {submitting ? (
+                      <>
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
+                        {isRegister ? "Menyimpan ke Supabase…" : "Memverifikasi…"}
+                      </>
+                    ) : role === "ADMIN" ? (
                       <>
                         <ShieldCheck className="h-4 w-4" />
                         Masuk ke Dashboard
@@ -485,7 +499,7 @@ export function LoginScreen({
                 <div className="mt-4 flex items-center justify-center gap-2">
                   <Wifi className="h-3.5 w-3.5 text-emerald-400" />
                   <p className="text-[10.5px] text-slate-500">
-                    Akun & data tersimpan lokal di perangkat Anda
+                    Akun & data tersimpan aman di Supabase
                   </p>
                 </div>
               </div>

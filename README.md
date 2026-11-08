@@ -6,12 +6,27 @@ Dashboard manajemen organisasi berbasis **Next.js 16 (App Router)**, **React 19*
 
 ## Menjalankan aplikasi
 
+1. Buat project Supabase, lalu jalankan seluruh isi `supabase/schema.sql` di
+   **Supabase Dashboard → SQL Editor**. File ini membuat tabel `users`,
+   `members`, bucket `profile-pictures`, policy, dan akun admin awal.
+2. Salin `.env.example` menjadi `.env.local`, lalu isi:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
+```
+
+3. Jalankan aplikasi:
+
 ```bash
 npm install
 npm run dev
 ```
 
 Buka [http://localhost:3000](http://localhost:3000).
+
+> Di Vercel, tambahkan dua environment variable yang sama pada
+> **Project Settings → Environment Variables**, lalu redeploy.
 
 Preview khusus tampilan mobile (bingkai ponsel 390×844):
 
@@ -47,9 +62,10 @@ npm start
 | **PENGGUNA** | Buat akun lewat tab **Daftar Akun Baru** (username + password min. 6 karakter + foto profil opsional), lalu login | Baca data anggota, registrasi anggota, lihat absensi, lihat/unduh KTA sendiri |
 | **ADMIN** | Username `adminpusbaya` + password `pusbaya1974` | Akses penuh: tambah/edit/hapus anggota, unduh direktori PDF, kelola sesi absensi & denda, WA blast, pilih semua KTA |
 
-> Aplikasi dimulai tanpa data tiruan. Semua KPI, grafik distribusi, dan
-> rekap dihitung dari data yang didaftarkan melalui formulir. Akun pengguna
-> disimpan lokal di browser (demo), foto profil otomatis dikompres ke 256×256.
+> Aplikasi tidak memakai data tiruan. Semua KPI, grafik distribusi, dan rekap
+> dihitung dari data anggota di Supabase. Akun, sesi login, dan data anggota
+> diverifikasi/diambil langsung dari database; foto profil diunggah ke bucket
+> `profile-pictures` dan dikompres ke 256×256 sebelum dikirim.
 
 ## Modul
 
@@ -69,9 +85,18 @@ npm start
 
 ## Penyimpanan data
 
-Seluruh data disimpan di `localStorage` browser dengan prefix `pusbaya_hub_v1`
-(`_auth`, `_accounts`, `_members`, `_sessions`) melalui Context API.
-Data antar-tab disinkronkan lewat event `storage` dan tombol **Refresh Data**.
+Data utama tersimpan di **Supabase**:
+
+- `users` — akun pengguna/admin, password, role, dan URL foto profil.
+- `members` — seluruh data anggota, terhubung ke akun lewat `user_id`/`username`.
+- Storage bucket `profile-pictures` — file foto profil publik.
+
+Login dan registrasi langsung memverifikasi/menulis ke Supabase. Daftar anggota
+di Dashboard, tabel Daftar Pengguna, absensi, dan KTA selalu dimuat ulang dari
+tabel `members`. Hanya sesi login dan sesi absensi lokal yang memakai
+`localStorage` dengan prefix `pusbaya_hub_v1`; data akun/anggota tidak lagi
+disimpan di sana. Tombol **Refresh Data** memuat ulang data anggota dari
+Supabase.
 
 ## Struktur
 
@@ -85,9 +110,11 @@ src/
     members/           form anggota reusable
     ui/                modal, empty state, toast, logo, konfirmasi
     views/             dashboard, anggota, absensi, blast, KTA
-  context/             AppContext (auth + seluruh state persisten)
+  context/             AppContext (auth Supabase + sesi absensi lokal)
   hooks/               useLocalStorageState
-  lib/                 tipe, konstanta, util (WA, format, QR), ekspor PDF
+  lib/                 tipe, konstanta, util, Supabase client & repository, ekspor PDF
+supabase/
+  schema.sql           tabel users/members, RLS policy, bucket foto, seed admin
 public/
   logo-stt.png         emblem resmi ST PUSBAYA
   landing-bg.jpg       foto latar landing page

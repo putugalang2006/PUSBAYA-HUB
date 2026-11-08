@@ -130,14 +130,15 @@ export function DashboardView({
               <MemberForm
                 compact
                 submitLabel="Daftarkan Saya"
-                onSubmit={(input) => {
-                  const created = addMember(input);
-                  if (!created) return;
+                onSubmit={async (input) => {
+                  const created = await addMember(input);
+                  if (!created) return false;
                   pushToast(
                     "success",
                     "Registrasi Berhasil!",
                     "KTA Digital Anda telah terbit.",
                   );
+                  return true;
                 }}
               />
             </div>
@@ -189,14 +190,15 @@ export function DashboardView({
             <div className="rounded-2xl border border-amber-400/[0.12] bg-black/25 p-4 sm:p-5">
               <MemberForm
                 submitLabel="Daftarkan Anggota"
-                onSubmit={(input) => {
-                  const created = addMember(input);
-                  if (!created) return;
+                onSubmit={async (input) => {
+                  const created = await addMember(input);
+                  if (!created) return false;
                   pushToast(
                     "success",
                     "Anggota berhasil didaftarkan",
                     `${created.nama} · ${created.id} · ${created.tempekan}`,
                   );
+                  return true;
                 }}
               />
             </div>

@@ -31,7 +31,9 @@ export function MemberForm({
   compact = false,
 }: {
   initial?: Member;
-  onSubmit: (input: MemberInput) => void;
+  onSubmit: (
+    input: MemberInput,
+  ) => Promise<boolean | void> | boolean | void;
   submitLabel?: string;
   onCancel?: () => void;
   compact?: boolean;
@@ -47,9 +49,11 @@ export function MemberForm({
   );
   const [usia, setUsia] = useState<AgeGroup>(initial?.usia ?? "Dewasa");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     if (nama.trim().length < 3) {
       setError("Nama lengkap minimal 3 karakter.");
       return;
@@ -63,21 +67,33 @@ export function MemberForm({
       return;
     }
     setError("");
-    onSubmit({
-      nama: nama.trim(),
-      alamat: alamat.trim(),
-      whatsapp: whatsapp.trim(),
-      tempekan,
-      status,
-      usia,
-    });
-    if (!initial) {
-      setNama("");
-      setAlamat("");
-      setWhatsapp("");
-      setTempekan(TEMPEKAN_LIST[0]);
-      setStatus("Anggota");
-      setUsia("Dewasa");
+    setSubmitting(true);
+    try {
+      const saved = await onSubmit({
+        nama: nama.trim(),
+        alamat: alamat.trim(),
+        whatsapp: whatsapp.trim(),
+        tempekan,
+        status,
+        usia,
+      });
+      if (saved === false) return;
+      if (!initial) {
+        setNama("");
+        setAlamat("");
+        setWhatsapp("");
+        setTempekan(TEMPEKAN_LIST[0]);
+        setStatus("Anggota");
+        setUsia("Dewasa");
+      }
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Data gagal disimpan. Coba lagi.",
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -216,10 +232,20 @@ export function MemberForm({
         )}
         <button
           type="submit"
-          className={cn("btn btn-gold", onCancel ? "" : "w-full")}
+          disabled={submitting}
+          aria-busy={submitting}
+          className={cn(
+            "btn btn-gold",
+            onCancel ? "" : "w-full",
+            submitting && "cursor-wait opacity-75",
+          )}
         >
-          <Check className="h-4 w-4" />
-          {submitLabel}
+          {submitting ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
+          ) : (
+            <Check className="h-4 w-4" />
+          )}
+          {submitting ? "Menyimpan ke Supabase…" : submitLabel}
         </button>
       </div>
     </form>

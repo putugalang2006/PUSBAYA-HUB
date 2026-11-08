@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Modal } from "./Modal";
 
@@ -17,9 +18,22 @@ export function ConfirmDialog({
   description: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  onConfirm: () => void;
+  onConfirm: () => Promise<boolean | void> | boolean | void;
   onClose: () => void;
 }) {
+  const [busy, setBusy] = useState(false);
+
+  const handleConfirm = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await onConfirm();
+      if (result !== false) onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Modal
       open={open}
@@ -34,12 +48,11 @@ export function ConfirmDialog({
           <button
             type="button"
             className="btn btn-danger"
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
+            onClick={handleConfirm}
+            disabled={busy}
+            aria-busy={busy}
           >
-            {confirmLabel}
+            {busy ? "Memproses…" : confirmLabel}
           </button>
         </>
       }
