@@ -94,7 +94,7 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
           </span>
           <span className="mx-auto mt-3 block max-w-2xl text-balance text-[17px] font-medium leading-snug tracking-[0.01em] text-slate-50 sm:mt-4 sm:text-2xl lg:text-[27px]">
             Sistem Pendataan &amp; Administrasi{" "}
-            <span className="text-amber-200">Terpadu Banjar</span>
+            <span className="text-amber-200">Sekaa Truna</span>
           </span>
         </h1>
 
@@ -131,11 +131,6 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
             </span>
           </button>
         </div>
-
-        <p className="mt-3 flex items-center justify-center gap-2 text-[9px] font-medium uppercase tracking-[0.12em] text-slate-300/75 drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)] sm:text-[10px]">
-          <span className="h-1 w-1 rounded-full bg-emerald-400" />
-          Satu akun · Satu data anggota · KTA digital otomatis
-        </p>
       </section>
 
       <footer className="relative z-10 shrink-0 border-t border-white/[0.08] bg-[#08090c]/60 backdrop-blur-md">
