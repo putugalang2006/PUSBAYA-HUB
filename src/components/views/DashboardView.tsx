@@ -22,6 +22,7 @@ import { ST_NAME, TEMPEKAN_LIST } from "@/lib/constants";
 import { cn, formatDateShort, formatNumber, percent } from "@/lib/utils";
 import { MemberForm } from "@/components/members/MemberForm";
 import { LogoMark } from "@/components/ui/Logo";
+import { EditProfileButton } from "@/components/profile/EditProfileButton";
 import type { Member, PageKey } from "@/lib/types";
 
 export function DashboardView({
@@ -475,15 +476,22 @@ function RegisteredMemberCard({
         />
       </div>
 
-      <button
-        type="button"
-        onClick={() => onNavigate("kta")}
-        className="btn btn-gold group mt-5 w-full"
-      >
-        <IdCard className="h-4 w-4" />
-        Lihat KTA Digital Saya
-        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-      </button>
+      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => onNavigate("kta")}
+          className="btn btn-gold group w-full"
+        >
+          <IdCard className="h-4 w-4" />
+          Lihat KTA Digital Saya
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </button>
+        <EditProfileButton
+          variant="outline"
+          label="Edit Profil"
+          className="w-full justify-center"
+        />
+      </div>
 
       <p className="mt-3 text-center text-[9.5px] leading-relaxed text-slate-500">
         Satu akun hanya dapat mendaftarkan satu data anggota. Hubungi admin

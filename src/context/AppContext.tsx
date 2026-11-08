@@ -34,9 +34,12 @@ import {
   fetchUserByUsername,
   insertMember,
   insertUser,
+  updateMemberProfile,
   updateMemberRecord,
+  updateUserProfile,
   uploadProfilePhoto,
   usernameExists,
+  usernameTakenByOther,
 } from "@/lib/supabaseData";
 import {
   readStorage,
@@ -63,6 +66,12 @@ interface AppContextValue {
     photoName?: string;
   }) => Promise<LoginResult>;
   logout: () => void;
+  updateProfile: (input: {
+    username: string;
+    photoDataUrl?: string;
+    photoName?: string;
+    removePhoto?: boolean;
+  }) => Promise<LoginResult>;
 
   members: Member[];
   addMember: (input: MemberInput) => Promise<Member | null>;
@@ -403,6 +412,124 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     pushToast("info", "Anda telah keluar", "Sesi login berhasil diakhiri.");
   }, [pushToast, setAuth]);
 
+  const updateProfile = useCallback(
+    async (input: {
+      username: string;
+      photoDataUrl?: string;
+      photoName?: string;
+      removePhoto?: boolean;
+    }): Promise<LoginResult> => {
+      if (!auth) {
+        return { ok: false, error: "Sesi tidak ditemukan. Silakan login ulang." };
+      }
+      if (!auth.userId) {
+        return {
+          ok: false,
+          error: "Akun ini belum memiliki ID yang valid. Silakan login ulang.",
+        };
+      }
+
+      const newUsername = input.username.trim().toLowerCase();
+      if (newUsername.length < 3) {
+        return { ok: false, error: "Username minimal 3 karakter." };
+      }
+      if (newUsername.length > 24) {
+        return { ok: false, error: "Username maksimal 24 karakter." };
+      }
+      if (/\s/.test(newUsername)) {
+        return { ok: false, error: "Username tidak boleh mengandung spasi." };
+      }
+
+      const currentUsername = auth.username.trim().toLowerCase();
+      const usernameChanged = newUsername !== currentUsername;
+
+      try {
+        if (
+          usernameChanged &&
+          (newUsername === ADMIN_USERNAME ||
+            (await usernameTakenByOther(newUsername, auth.userId)))
+        ) {
+          return {
+            ok: false,
+            error: "Username sudah digunakan. Pilih username lain.",
+          };
+        }
+
+        let photoUrl: string | null | undefined;
+        if (input.removePhoto) {
+          photoUrl = null;
+        }
+        if (input.photoDataUrl) {
+          try {
+            photoUrl = await uploadProfilePhoto(
+              input.photoDataUrl,
+              newUsername,
+              input.photoName,
+            );
+          } catch (error) {
+            return { ok: false, error: `Gagal upload foto: ${errorText(error)}` };
+          }
+        }
+
+        const pictureChanged = photoUrl !== undefined;
+
+        await updateUserProfile({
+          userId: auth.userId ?? "",
+          username: usernameChanged ? newUsername : undefined,
+          photoUrl: pictureChanged ? photoUrl ?? null : undefined,
+        });
+
+        const linkedMember = findMemberForAuth(members, auth);
+        let updatedMember: Member | undefined;
+        if (linkedMember) {
+          updatedMember = await updateMemberProfile(linkedMember.id, {
+            username: usernameChanged ? newUsername : undefined,
+            profilePicture: pictureChanged ? photoUrl ?? null : undefined,
+          });
+        }
+
+        setAuth((prev) =>
+          prev
+            ? {
+                ...prev,
+                username: usernameChanged ? newUsername : prev.username,
+                name: usernameChanged ? newUsername : prev.name,
+                photo: pictureChanged ? photoUrl ?? undefined : prev.photo,
+              }
+            : prev,
+        );
+
+        if (updatedMember) {
+          const next = updatedMember;
+          setMembers((prev) =>
+            prev.map((member) => (member.id === next.id ? next : member)),
+          );
+        } else if (usernameChanged) {
+          setMembers((prev) =>
+            prev.map((member) =>
+              member.userId && member.userId === auth.userId
+                ? { ...member, username: newUsername }
+                : member,
+            ),
+          );
+        }
+
+        setLastSyncedAt(syncedTime());
+        pushToast(
+          "success",
+          "Profil berhasil diperbarui!",
+          "Perubahan username dan foto tersimpan ke Supabase.",
+        );
+        return { ok: true };
+      } catch (error) {
+        const message = errorText(error);
+        pushToast("error", "Gagal memperbarui profil", message);
+        return { ok: false, error: message };
+      }
+    },
+    [auth, members, pushToast, setAuth],
+  );
+
   const addMember = useCallback(
     async (input: MemberInput): Promise<Member | null> => {
       if (!auth) {
@@ -585,6 +712,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       login,
       registerAccount,
       logout,
+      updateProfile,
       members,
       addMember,
       updateMember,
@@ -609,6 +737,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       login,
       registerAccount,
       logout,
+      updateProfile,
       members,
       addMember,
       updateMember,

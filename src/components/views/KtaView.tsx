@@ -166,9 +166,10 @@ export function KtaView({
             <KtaCard
               member={selected}
               photo={
-                ownMember && selected.id === ownMember.id
+                selected.profilePicture ??
+                (ownMember && selected.id === ownMember.id
                   ? auth?.photo
-                  : undefined
+                  : undefined)
               }
             />
 

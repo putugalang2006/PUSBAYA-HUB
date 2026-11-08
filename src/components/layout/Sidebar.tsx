@@ -16,6 +16,7 @@ import { NAV_ITEMS } from "@/lib/constants";
 import { cn } from "@/lib/utils";import { useApp } from "@/context/AppContext";
 import { LogoLockup } from "@/components/ui/Logo";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { EditProfileButton } from "@/components/profile/EditProfileButton";
 
 const ICONS = {
   dashboard: Home,
@@ -83,6 +84,12 @@ export function Sidebar({
               </span>
             </div>
           </div>
+          <EditProfileButton
+            variant="outline"
+            compact
+            label="Edit Profil"
+            className="relative mt-3 w-full justify-center"
+          />
         </div>
       </div>
 

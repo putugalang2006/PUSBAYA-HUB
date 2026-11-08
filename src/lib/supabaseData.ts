@@ -28,6 +28,7 @@ type DbMemberRow = {
   id: string;
   user_id?: string | null;
   username?: string | null;
+  profile_picture?: string | null;
   nama: string;
   alamat: string;
   whatsapp: string;
@@ -61,6 +62,7 @@ function normalizeMemberRow(row: DbMemberRow): Member {
     id: row.id,
     userId: row.user_id ?? undefined,
     username: row.username ?? undefined,
+    profilePicture: row.profile_picture ?? undefined,
     nama: row.nama,
     alamat: row.alamat,
     whatsapp: row.whatsapp,
@@ -76,7 +78,12 @@ function normalizeUserRow(row: DbUserRow): DbUser {
     id: row.id,
     username: row.username,
     password: row.password,
-    photo: row.profile_picture ?? row.photo_url ?? undefined,
+    // When the `profile_picture` column exists it is authoritative (even when
+    // null, meaning the photo was removed). Otherwise fall back to `photo_url`.
+    photo:
+      row.profile_picture !== undefined
+        ? row.profile_picture ?? undefined
+        : row.photo_url ?? undefined,
     role: row.role?.toUpperCase() === "ADMIN" ? "ADMIN" : "PENGGUNA",
     createdAt: row.created_at ?? new Date().toISOString(),
   };
@@ -119,13 +126,21 @@ export async function usernameExists(username: string): Promise<boolean> {
   return Boolean(data);
 }
 
-function sanitizeStorageName(value: string): string {
-  const cleaned = value
-    .normalize("NFKD")
-    .replace(/[^a-zA-Z0-9._-]+/g, "_")
-    .replace(/^[._-]+|[._-]+$/g, "")
-    .slice(0, 80);
-  return cleaned || "profile";
+/** True when the username belongs to a different account than userId. */
+export async function usernameTakenByOther(
+  username: string,
+  userId?: string,
+): Promise<boolean> {
+  assertSupabaseConfigured();
+  const { data, error } = await supabase
+    .from("users")
+    .select("id")
+    .eq("username", username.trim().toLowerCase())
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return false;
+  return data.id !== userId;
 }
 
 export async function uploadProfilePhoto(
@@ -145,11 +160,12 @@ export async function uploadProfilePhoto(
       : mimeExtension && /^[a-z0-9]+$/.test(mimeExtension)
         ? mimeExtension
         : "jpg";
-  const originalBase = (originalName || username).replace(/\.[^./\\]+$/, "");
-  const safeBase = sanitizeStorageName(originalBase);
-  // Keep the object key flat and clean: no leading slash, spaces, quotes,
-  // hashes, question marks, or other characters that break Storage URLs.
-  const fileName = `${Date.now()}_${safeBase}.${extension}`;
+  // Unique, clean object key: no leading slash, spaces, quotes, hashes or
+  // question marks that break Storage URLs. Keeps the original extension.
+  const rawName = originalName || `${username || "profile"}.${extension}`;
+  const safeName = rawName.replace(/[^a-zA-Z0-9.-]/g, "_") || `profile.${extension}`;
+  const hasExtension = /\.[a-zA-Z0-9]+$/.test(safeName);
+  const fileName = `${Date.now()}_${hasExtension ? safeName : `${safeName}.${extension}`}`;
   const filePath = fileName.replace(/^\/+/, "");
 
   const { error } = await supabase.storage
@@ -213,6 +229,113 @@ export async function insertUser(input: {
   }
 
   throw new Error(lastError);
+}
+
+/**
+ * Updates the signed-in account row. Only the provided fields are changed.
+ * Falls back to the legacy `photo_url` column when `profile_picture` is
+ * not present in the database yet.
+ */
+export async function updateUserProfile(input: {
+  userId: string;
+  username?: string;
+  photoUrl?: string | null;
+}): Promise<DbUser> {
+  assertSupabaseConfigured();
+
+  const base: Record<string, string | null> = {};
+  if (input.username !== undefined) {
+    base.username = input.username.trim().toLowerCase();
+  }
+
+  const attempts: Array<Record<string, string | null>> = [];
+  if (input.photoUrl !== undefined) {
+    attempts.push({ ...base, profile_picture: input.photoUrl });
+    attempts.push({ ...base, photo_url: input.photoUrl });
+  } else {
+    attempts.push(base);
+  }
+
+  let lastError = "Gagal memperbarui profil ke Supabase.";
+  for (const payload of attempts) {
+    if (Object.keys(payload).length === 0) {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", input.userId)
+        .single();
+      if (error) {
+        lastError = error.message;
+        continue;
+      }
+      return normalizeUserRow(data as DbUserRow);
+    }
+
+    const { data, error } = await supabase
+      .from("users")
+      .update(payload)
+      .eq("id", input.userId)
+      .select("*")
+      .single();
+
+    if (!error) return normalizeUserRow(data as DbUserRow);
+
+    lastError = error.message;
+    const missingProfileColumn =
+      /profile_picture/i.test(error.message) &&
+      /column|schema cache|does not exist/i.test(error.message);
+    if (!missingProfileColumn) break;
+  }
+
+  throw new Error(lastError);
+}
+
+/**
+ * Updates the member row linked to the account. `profile_picture` is optional
+ * so older databases without that column keep working.
+ */
+export async function updateMemberProfile(
+  id: string,
+  input: { username?: string; profilePicture?: string | null },
+): Promise<Member> {
+  assertSupabaseConfigured();
+
+  const base: Record<string, string | null> = {};
+  if (input.username !== undefined) base.username = input.username;
+
+  if (input.profilePicture !== undefined) {
+    const { data, error } = await supabase
+      .from("members")
+      .update({ ...base, profile_picture: input.profilePicture })
+      .eq("id", id)
+      .select("*")
+      .single();
+    if (!error) return normalizeMemberRow(data as DbMemberRow);
+
+    const missingProfileColumn =
+      /profile_picture/i.test(error.message) &&
+      /column|schema cache|does not exist/i.test(error.message);
+    if (!missingProfileColumn) throw new Error(error.message);
+  }
+
+  if (Object.keys(base).length === 0) {
+    const { data, error } = await supabase
+      .from("members")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) throw new Error(error.message);
+    return normalizeMemberRow(data as DbMemberRow);
+  }
+
+  const { data, error } = await supabase
+    .from("members")
+    .update(base)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return normalizeMemberRow(data as DbMemberRow);
 }
 
 export async function insertMember(input: {

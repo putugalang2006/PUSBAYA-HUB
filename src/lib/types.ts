@@ -38,6 +38,7 @@ export interface Member {
   id: string;
   userId?: string;
   username?: string;
+  profilePicture?: string;
   nama: string;
   alamat: string;
   whatsapp: string;

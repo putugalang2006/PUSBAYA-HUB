@@ -28,6 +28,7 @@ create table if not exists public.members (
   id text primary key,
   user_id uuid references public.users(id) on delete set null,
   username text,
+  profile_picture text,
   nama text not null,
   alamat text not null,
   whatsapp text not null,
@@ -39,6 +40,7 @@ create table if not exists public.members (
 
 alter table public.members add column if not exists user_id uuid;
 alter table public.members add column if not exists username text;
+alter table public.members add column if not exists profile_picture text;
 alter table public.members add column if not exists nama text;
 alter table public.members add column if not exists alamat text;
 alter table public.members add column if not exists whatsapp text;
