@@ -118,44 +118,52 @@ export function ProfileEditModal({
       <div className="space-y-5">
         <div>
           <span className="label">Foto Profil</span>
-          <div className="flex items-center gap-4 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-            <UserAvatar
-              name={username || auth?.name || "Pengguna"}
-              photo={currentPhoto}
-              size={64}
-              className="text-base"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-4 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3.5">
+              <UserAvatar
+                name={username || auth?.name || "Pengguna"}
+                photo={currentPhoto}
+                size={64}
+                className="shrink-0 text-base"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold text-white">
+                  {auth?.name || username || "Pengguna"}
+                </p>
+                {username &&
+                  username.toLowerCase() !==
+                    (auth?.name ?? "").toLowerCase() && (
+                    <p className="mt-0.5 truncate font-mono text-[11px] text-slate-500">
+                      @{username}
+                    </p>
+                  )}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={photoBusy || busy}
+                className="btn btn-outline btn-sm"
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                {photoBusy
+                  ? "Mengompres foto…"
+                  : currentPhoto
+                    ? "Ganti Foto"
+                    : "Pilih Foto"}
+              </button>
+              {currentPhoto && (
                 <button
                   type="button"
-                  onClick={() => fileRef.current?.click()}
+                  onClick={handleRemovePhoto}
                   disabled={photoBusy || busy}
-                  className="btn btn-outline btn-sm"
+                  className="btn btn-ghost btn-sm text-red-400/80 hover:text-red-300"
                 >
-                  <ImagePlus className="h-3.5 w-3.5" />
-                  {photoBusy
-                    ? "Mengompres foto…"
-                    : currentPhoto
-                      ? "Ganti Foto"
-                      : "Pilih Foto"}
+                  <Trash2 className="h-3 w-3" />
+                  Hapus
                 </button>
-                {currentPhoto && (
-                  <button
-                    type="button"
-                    onClick={handleRemovePhoto}
-                    disabled={photoBusy || busy}
-                    className="btn btn-ghost btn-sm text-red-400/80 hover:text-red-300"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    Hapus
-                  </button>
-                )}
-              </div>
-              <p className="mt-1.5 text-[9.5px] leading-relaxed text-slate-500">
-                JPG/PNG/WEBP maksimal 8 MB. Foto otomatis dikompres (maks 800px,
-                WebP) sebelum diunggah ke Supabase Storage.
-              </p>
+              )}
             </div>
           </div>
           <input
