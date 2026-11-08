@@ -20,13 +20,8 @@ import {
   TEMPEKAN_LIST,
 } from "@/lib/constants";
 import type { Member, PageKey } from "@/lib/types";
-import {
-  cn,
-  downloadCsv,
-  formatDateShort,
-  formatNumber,
-  initials,
-} from "@/lib/utils";
+import { downloadMembersPdf } from "@/lib/memberPdf";
+import { cn, formatNumber, initials } from "@/lib/utils";
 import { MemberForm } from "@/components/members/MemberForm";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -54,6 +49,7 @@ export function MembersView({
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Member | null>(null);
   const [deleting, setDeleting] = useState<Member | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -87,39 +83,33 @@ export function MembersView({
     setUsiaFilter("ALL");
   };
 
-  const exportCsv = () => {
-    if (filtered.length === 0) {
-      pushToast("info", "Tidak ada data", "Filter saat ini tidak menghasilkan data.");
+  const exportPdf = async () => {
+    if (members.length === 0) {
+      pushToast(
+        "info",
+        "Tidak ada data",
+        "Belum ada data anggota yang dapat diunduh.",
+      );
       return;
     }
-    downloadCsv(
-      `pusbaya-anggota-${new Date().toISOString().slice(0, 10)}.csv`,
-      [
-        "ID Anggota",
-        "Nama Lengkap",
-        "Nomor WhatsApp",
-        "Alamat",
-        "Tempekan",
-        "Status",
-        "Kategori Usia",
-        "Terdaftar",
-      ],
-      filtered.map((member) => [
-        member.id,
-        member.nama,
-        member.whatsapp,
-        member.alamat,
-        member.tempekan,
-        member.status,
-        member.usia,
-        formatDateShort(member.createdAt.slice(0, 10)),
-      ]),
-    );
-    pushToast(
-      "success",
-      "Export CSV berhasil",
-      `${filtered.length} data anggota diunduh.`,
-    );
+    if (exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      await downloadMembersPdf(members);
+      pushToast(
+        "success",
+        "PDF berhasil diunduh",
+        `${members.length} data anggota tersimpan dalam satu PDF.`,
+      );
+    } catch {
+      pushToast(
+        "error",
+        "Gagal membuat PDF",
+        "Coba lagi atau gunakan browser lain.",
+      );
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   return (
@@ -144,11 +134,22 @@ export function MembersView({
               <div className="flex items-center gap-2 md:ml-auto">
                 <button
                   type="button"
-                  onClick={exportCsv}
-                  className="btn btn-outline btn-sm sm:px-3.5 sm:py-2.5"
+                  onClick={exportPdf}
+                  disabled={exportingPdf}
+                  aria-busy={exportingPdf}
+                  title="Unduh seluruh data anggota sebagai PDF"
+                  className={cn(
+                    "btn btn-outline btn-sm sm:px-3.5 sm:py-2.5",
+                    exportingPdf && "cursor-wait opacity-70",
+                  )}
                 >
-                  <Download className="h-3.5 w-3.5" />
-                  Export CSV
+                  <Download
+                    className={cn(
+                      "h-3.5 w-3.5",
+                      exportingPdf && "animate-pulse",
+                    )}
+                  />
+                  {exportingPdf ? "Menyiapkan PDF…" : "Unduh PDF"}
                 </button>
                 <button
                   type="button"

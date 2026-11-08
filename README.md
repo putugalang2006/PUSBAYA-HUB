@@ -45,7 +45,7 @@ npm start
 | Role | Cara masuk | Hak akses |
 | --- | --- | --- |
 | **PENGGUNA** | Buat akun lewat tab **Daftar Akun Baru** (username + password min. 6 karakter + foto profil opsional), lalu login | Baca data anggota, registrasi anggota, lihat absensi, lihat/unduh KTA sendiri |
-| **ADMIN** | Username `adminpusbaya` + password `pusbaya1974` | Akses penuh: tambah/edit/hapus anggota, export CSV, kelola sesi absensi & denda, WA blast, pilih semua KTA |
+| **ADMIN** | Username `adminpusbaya` + password `pusbaya1974` | Akses penuh: tambah/edit/hapus anggota, unduh direktori PDF, kelola sesi absensi & denda, WA blast, pilih semua KTA |
 
 > Aplikasi dimulai tanpa data tiruan. Semua KPI, grafik distribusi, dan
 > rekap dihitung dari data yang didaftarkan melalui formulir. Akun pengguna
@@ -57,7 +57,8 @@ npm start
    registrasi anggota sebelum dashboard lengkap tampil; setelah terdaftar,
    dashboard menampilkan KPI, status keanggotaan, dan distribusi per tempekan.
 2. **Daftar Pengguna** — pencarian, filter tempekan/status/usia, tabel anggota,
-   modal edit, hapus, export CSV.
+   modal edit, hapus, serta unduh direktori PDF mewah berisi seluruh data
+   anggota dan logo resmi STT.
 3. **Absensi Digital** — sesi sangkep, status HADIR/IZIN/ALPHA, simulator scan
    QR KTA, rekap persentase & total denda.
 4. **WA Blast** — target per tempekan/pengurus, variabel `{nama_anggota}` dan
@@ -86,7 +87,7 @@ src/
     views/             dashboard, anggota, absensi, blast, KTA
   context/             AppContext (auth + seluruh state persisten)
   hooks/               useLocalStorageState
-  lib/                 tipe, konstanta, util (CSV, WA, format, QR)
+  lib/                 tipe, konstanta, util (WA, format, QR), ekspor PDF
 public/
   logo-stt.png         emblem resmi ST PUSBAYA
   landing-bg.jpg       foto latar landing page
