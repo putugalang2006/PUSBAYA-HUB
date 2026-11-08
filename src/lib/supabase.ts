@@ -1,15 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseKey =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  "";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 
 export const SUPABASE_CONFIG_ERROR =
-  "Supabase belum dikonfigurasi. Tambahkan NEXT_PUBLIC_SUPABASE_URL dan NEXT_PUBLIC_SUPABASE_ANON_KEY pada environment aplikasi.";
+  "Koneksi Supabase belum dikonfigurasi. Pastikan NEXT_PUBLIC_SUPABASE_URL dan NEXT_PUBLIC_SUPABASE_ANON_KEY sudah terpasang di environment.";
 
 export const supabase = createClient(
   supabaseUrl || "https://placeholder.supabase.co",
@@ -24,7 +21,10 @@ export const supabase = createClient(
 );
 
 export function assertSupabaseConfigured(): void {
-  if (!isSupabaseConfigured) {
-    throw new Error(SUPABASE_CONFIG_ERROR);
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    throw new Error("Supabase URL belum terpasang di env!");
+  }
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    throw new Error("Supabase ANON KEY belum terpasang di env!");
   }
 }

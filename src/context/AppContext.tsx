@@ -303,13 +303,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         return { ok: true };
       } catch (error) {
-        return {
-          ok: false,
-          error: reportSupabaseError(
-            "Gagal memverifikasi login ke Supabase",
-            error,
-          ),
-        };
+        throw error instanceof Error ? error : new Error(errorText(error));
       }
     },
     [loadMembers, reportSupabaseError, setAuth],
@@ -366,13 +360,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               input.photoName,
             );
           } catch (error) {
-            return {
-              ok: false,
-              error: reportSupabaseError(
-                "Gagal mengunggah foto ke Supabase",
-                error,
-              ),
-            };
+            throw new Error(`Gagal upload foto: ${errorText(error)}`);
           }
         }
 
@@ -384,10 +372,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             photoUrl,
           });
         } catch (error) {
-          return {
-            ok: false,
-            error: reportSupabaseError("Gagal menyimpan ke Supabase", error),
-          };
+          throw new Error(errorText(error));
         }
 
         setAuth({
@@ -406,10 +391,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         return { ok: true };
       } catch (error) {
-        return {
-          ok: false,
-          error: reportSupabaseError("Gagal menyimpan ke Supabase", error),
-        };
+        throw error instanceof Error ? error : new Error(errorText(error));
       }
     },
     [loadMembers, reportSupabaseError, setAuth],

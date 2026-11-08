@@ -140,6 +140,16 @@ export function LoginScreen({
         return;
       }
       onSuccess();
+    } catch (error) {
+      const detail =
+        error instanceof Error
+          ? error.message
+          : JSON.stringify(error) || String(error);
+      const message = detail.startsWith("Gagal upload foto:")
+        ? detail
+        : `Koneksi Gagal: ${detail}`;
+      setError(message);
+      window.alert(message);
     } finally {
       setSubmitting(false);
     }
