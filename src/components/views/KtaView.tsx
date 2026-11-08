@@ -25,6 +25,7 @@ import {
 } from "@/lib/utils";
 import { LogoMark } from "@/components/ui/Logo";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Modal } from "@/components/ui/Modal";
 
 export function KtaView({
   onNavigate,
@@ -309,7 +310,7 @@ function KtaCard({ member, photo }: { member: Member; photo?: string }) {
   return (
     <div
       id="kta-card-node"
-      className="kta-shell relative aspect-[1.58/1] w-full max-w-[560px] overflow-hidden rounded-2xl px-5 py-4 sm:px-7 sm:py-5"
+      className="kta-shell box-border relative w-full max-w-[560px] overflow-hidden rounded-2xl p-4 sm:p-6"
     >
       <div className="kta-shine" />
       <div
@@ -359,6 +360,7 @@ function KtaCard({ member, photo }: { member: Member; photo?: string }) {
                 <img
                   src={photo}
                   alt={`Foto ${member.nama}`}
+                  crossOrigin="anonymous"
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -398,6 +400,7 @@ function KtaCard({ member, photo }: { member: Member; photo?: string }) {
                 <img
                   src={qr}
                   alt={`QR KTA ${member.nama}`}
+                  crossOrigin="anonymous"
                   className="h-[40px] w-[40px] sm:h-[58px] sm:w-[58px]"
                 />
               ) : (
@@ -442,6 +445,96 @@ function KtaCard({ member, photo }: { member: Member; photo?: string }) {
   );
 }
 
+function isMobileBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 &&
+      window.matchMedia("(max-width: 1024px)").matches)
+  );
+}
+
+function sanitizeFileName(value: string): string {
+  return (
+    value
+      .normalize("NFKD")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "anggota"
+  );
+}
+
+async function waitForKtaImages(node: HTMLElement): Promise<void> {
+  try {
+    await document.fonts.ready;
+  } catch {
+    // Font embedding can continue even if the font set is unavailable.
+  }
+
+  const images = Array.from(node.querySelectorAll("img"));
+  await Promise.all(
+    images.map(async (image) => {
+      if (image.complete) {
+        try {
+          await image.decode();
+        } catch {
+          // A failed image must not block the rest of the card export.
+        }
+        return;
+      }
+      await new Promise<void>((resolve) => {
+        const done = () => resolve();
+        image.addEventListener("load", done, { once: true });
+        image.addEventListener("error", done, { once: true });
+      });
+    }),
+  );
+}
+
+function captureOptions(node: HTMLElement) {
+  const width = Math.max(1, node.offsetWidth);
+  const height = Math.max(1, node.offsetHeight);
+  const pixelRatio = Math.min(4, Math.max(3, Math.ceil(1050 / width)));
+
+  return {
+    cacheBust: true,
+    backgroundColor: "#0a0b0e",
+    width,
+    height,
+    pixelRatio,
+    style: {
+      transform: "none",
+      transformOrigin: "top left",
+      margin: "0",
+      boxSizing: "border-box",
+    },
+  };
+}
+
+async function renderKtaPng(node: HTMLElement): Promise<string> {
+  await waitForKtaImages(node);
+  return toPng(node, captureOptions(node));
+}
+
+function downloadDataUrl(dataUrl: string, fileName: string): void {
+  const link = document.createElement("a");
+  link.download = fileName;
+  link.href = dataUrl;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+async function dataUrlToPngFile(
+  dataUrl: string,
+  fileName: string,
+): Promise<File> {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  return new File([blob], fileName, { type: "image/png" });
+}
+
 function DownloadButton({
   member,
   format,
@@ -451,73 +544,122 @@ function DownloadButton({
 }) {
   const { pushToast } = useApp();
   const [downloading, setDownloading] = useState(false);
+  const [preview, setPreview] = useState<{
+    url: string;
+    fileName: string;
+  } | null>(null);
   const isPng = format === "png";
-  const safeName = member.nama.replace(/\s+/g, "-");
+  const safeName = sanitizeFileName(member.nama);
+  const baseFileName = `KTA-${member.id}-${safeName}`;
 
   const handleDownload = async () => {
     const node = document.getElementById("kta-card-node");
     if (!node) return;
     setDownloading(true);
     try {
-      const dataUrl = isPng
-        ? await toPng(node, {
-            cacheBust: true,
-            pixelRatio: 3,
-            backgroundColor: "#0a0b0e",
-            width: node.clientWidth,
-            height: node.clientHeight,
-          })
-        : await toJpeg(node, {
-            cacheBust: true,
-            pixelRatio: 2,
-            quality: 0.95,
-            backgroundColor: "#0a0b0e",
-            width: node.clientWidth,
-            height: node.clientHeight,
-          });
-
       if (isPng) {
-        const link = document.createElement("a");
-        link.download = `KTA-${member.id}-${safeName}.png`;
-        link.href = dataUrl;
-        link.click();
-      } else {
-        const { jsPDF } = await import("jspdf");
-        const pdf = new jsPDF({
-          orientation: "landscape",
-          unit: "mm",
-          format: "a4",
-        });
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 12;
-        const ratio = Math.min(
-          (pageWidth - margin * 2) / node.clientWidth,
-          (pageHeight - margin * 2) / node.clientHeight,
+        const dataUrl = await renderKtaPng(node);
+        const fileName = `${baseFileName}.png`;
+
+        if (isMobileBrowser()) {
+          const file = await dataUrlToPngFile(dataUrl, fileName);
+          let shared = false;
+
+          try {
+            if (
+              typeof navigator.share === "function" &&
+              typeof navigator.canShare === "function" &&
+              navigator.canShare({ files: [file] })
+            ) {
+              await navigator.share({
+                files: [file],
+                title: "KTA PUSBAYA",
+                text: `KTA Digital ${member.nama}`,
+              });
+              shared = true;
+            }
+          } catch (shareError) {
+            if (
+              shareError instanceof DOMException &&
+              shareError.name === "AbortError"
+            ) {
+              return;
+            }
+            // Older mobile browsers can reject Web Share; fall back to the
+            // long-press preview modal instead.
+          }
+
+          if (shared) {
+            pushToast(
+              "success",
+              "KTA siap disimpan",
+              "Pilih Simpan ke Galeri pada menu berbagi HP Anda.",
+            );
+            return;
+          }
+
+          setPreview({ url: dataUrl, fileName });
+          pushToast(
+            "info",
+            "KTA siap disimpan",
+            "Tekan dan tahan gambar untuk menyimpan ke Galeri HP.",
+          );
+          return;
+        }
+
+        downloadDataUrl(dataUrl, fileName);
+        pushToast(
+          "success",
+          "KTA berhasil diunduh",
+          `Kartu ${member.nama} tersimpan sebagai PNG.`,
         );
-        const width = node.clientWidth * ratio;
-        const height = node.clientHeight * ratio;
-        pdf.addImage(
-          dataUrl,
-          "JPEG",
-          (pageWidth - width) / 2,
-          (pageHeight - height) / 2,
-          width,
-          height,
-        );
-        pdf.save(`KTA-${member.id}-${safeName}.pdf`);
+        return;
       }
+
+      await waitForKtaImages(node);
+      const dataUrl = await toJpeg(node, {
+        ...captureOptions(node),
+        quality: 0.95,
+      });
+      const { jsPDF } = await import("jspdf");
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      const nodeWidth = node.offsetWidth;
+      const nodeHeight = node.offsetHeight;
+      const ratio = Math.min(
+        (pageWidth - margin * 2) / nodeWidth,
+        (pageHeight - margin * 2) / nodeHeight,
+      );
+      const width = nodeWidth * ratio;
+      const height = nodeHeight * ratio;
+      pdf.addImage(
+        dataUrl,
+        "JPEG",
+        (pageWidth - width) / 2,
+        (pageHeight - height) / 2,
+        width,
+        height,
+      );
+      pdf.save(`${baseFileName}.pdf`);
 
       pushToast(
         "success",
         "KTA berhasil diunduh",
-        `Kartu ${member.nama} tersimpan sebagai ${isPng ? "PNG" : "PDF"}.`,
+        `Kartu ${member.nama} tersimpan sebagai PDF.`,
       );
-    } catch {
+    } catch (error) {
       pushToast(
         "error",
         `Gagal mengunduh KTA ${isPng ? "PNG" : "PDF"}`,
-        "Coba lagi atau gunakan browser lain.",
+        error instanceof Error
+          ? error.message
+          : "Coba lagi atau gunakan browser lain.",
       );
     } finally {
       setDownloading(false);
@@ -525,21 +667,66 @@ function DownloadButton({
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleDownload}
-      disabled={downloading}
-      className={cn(
-        "btn py-2.5",
-        isPng ? "btn-gold" : "btn-outline",
-      )}
-    >
-      <Download className={cn("h-4 w-4", downloading && "animate-pulse")} />
-      {downloading
-        ? `Menyiapkan ${isPng ? "PNG" : "PDF"}…`
-        : isPng
-          ? "Unduh KTA (PNG)"
-          : "Unduh PDF"}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={handleDownload}
+        disabled={downloading}
+        className={cn("btn py-2.5", isPng ? "btn-gold" : "btn-outline")}
+      >
+        <Download className={cn("h-4 w-4", downloading && "animate-pulse")} />
+        {downloading
+          ? `Menyiapkan ${isPng ? "PNG" : "PDF"}…`
+          : isPng
+            ? "Download KTA"
+            : "Download PDF"}
+      </button>
+
+      <Modal
+        open={Boolean(preview)}
+        onClose={() => setPreview(null)}
+        title="Simpan KTA ke Galeri HP"
+        description="Gambar KTA sudah dirender dalam resolusi tinggi dan siap disimpan."
+        size="lg"
+        footer={
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => setPreview(null)}
+          >
+            Tutup
+          </button>
+        }
+      >
+        {preview && (
+          <div className="space-y-4 text-center">
+            <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
+              <p className="text-[12px] font-semibold text-amber-200">
+                Tekan dan tahan gambar untuk menyimpan ke Galeri HP
+              </p>
+              <p className="mt-1 text-[10.5px] text-slate-400">
+                Jika long-press tidak tersedia, gunakan tombol unduh di bawah.
+              </p>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={preview.url}
+              alt={`KTA ${member.nama}`}
+              crossOrigin="anonymous"
+              draggable={false}
+              className="mx-auto w-full max-w-[560px] rounded-xl border border-white/10 shadow-2xl shadow-black/50"
+            />
+            <a
+              href={preview.url}
+              download={preview.fileName}
+              className="btn btn-gold w-full sm:w-auto"
+            >
+              <Download className="h-4 w-4" />
+              Unduh Gambar
+            </a>
+          </div>
+        )}
+      </Modal>
+    </>
   );
 }

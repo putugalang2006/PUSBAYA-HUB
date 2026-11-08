@@ -22,6 +22,7 @@ export function LogoMark({
         alt="Logo ST Putra Settu Bhakti Jaya"
         width={size}
         height={size}
+        crossOrigin="anonymous"
         className="h-full w-full object-contain drop-shadow-[0_4px_14px_rgba(234,179,8,0.22)]"
         draggable={false}
       />
