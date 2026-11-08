@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, LoaderCircle, Trash2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { fileToAvatarDataUrl } from "@/lib/image";
+import { compressProfilePhoto } from "@/lib/image";
 import { Modal } from "@/components/ui/Modal";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 
@@ -45,9 +45,9 @@ export function ProfileEditModal({
     setPhotoBusy(true);
     setError("");
     try {
-      const dataUrl = await fileToAvatarDataUrl(file);
+      const { dataUrl, file: optimized } = await compressProfilePhoto(file);
       setPhoto(dataUrl);
-      setPhotoName(file.name);
+      setPhotoName(optimized.name);
       setRemovePhoto(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal memproses foto.");
@@ -135,7 +135,7 @@ export function ProfileEditModal({
                 >
                   <ImagePlus className="h-3.5 w-3.5" />
                   {photoBusy
-                    ? "Memproses…"
+                    ? "Mengompres foto…"
                     : currentPhoto
                       ? "Ganti Foto"
                       : "Pilih Foto"}
@@ -153,8 +153,8 @@ export function ProfileEditModal({
                 )}
               </div>
               <p className="mt-1.5 text-[9.5px] leading-relaxed text-slate-500">
-                JPG/PNG/WEBP maksimal 8 MB. Foto otomatis dipotong persegi dan
-                diunggah ke Supabase Storage.
+                JPG/PNG/WEBP maksimal 8 MB. Foto otomatis dikompres (maks 800px,
+                WebP) sebelum diunggah ke Supabase Storage.
               </p>
             </div>
           </div>

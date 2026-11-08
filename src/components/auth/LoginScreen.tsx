@@ -19,7 +19,7 @@ import { useApp } from "@/context/AppContext";
 import { APP_SUBTITLE } from "@/lib/constants";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { fileToAvatarDataUrl } from "@/lib/image";
+import { compressProfilePhoto } from "@/lib/image";
 import { LogoLockup } from "@/components/ui/Logo";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 
@@ -79,9 +79,9 @@ export function LoginScreen({
     setPhotoBusy(true);
     setError("");
     try {
-      const dataUrl = await fileToAvatarDataUrl(file);
+      const { dataUrl, file: optimized } = await compressProfilePhoto(file);
       setPhoto(dataUrl);
-      setPhotoName(file.name);
+      setPhotoName(optimized.name);
     } catch (photoError) {
       setError(
         photoError instanceof Error
@@ -404,7 +404,7 @@ export function LoginScreen({
                             >
                               <ImagePlus className="h-3.5 w-3.5" />
                               {photoBusy
-                                ? "Memproses…"
+                                ? "Mengompres foto…"
                                 : photo
                                   ? "Ganti Foto"
                                   : "Upload Foto"}
@@ -424,8 +424,9 @@ export function LoginScreen({
                             )}
                           </div>
                           <p className="mt-1.5 text-[9.5px] leading-relaxed text-slate-500">
-                            JPG/PNG/WEBP · otomatis dipotong persegi. Tanpa
-                            foto, avatar memakai inisial username.
+                            JPG/PNG/WEBP · otomatis dikompres (maks 800px, WebP)
+                            sebelum diunggah. Tanpa foto, avatar memakai inisial
+                            username.
                           </p>
                         </div>
                       </div>
