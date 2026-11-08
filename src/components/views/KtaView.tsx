@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgeCheck,
   CalendarDays,
@@ -278,8 +278,13 @@ function DetailRow({
   );
 }
 
+const KTA_DESIGN_WIDTH = 560;
+const KTA_DESIGN_HEIGHT = 353;
+
 function KtaCard({ member, photo }: { member: Member; photo?: string }) {
   const [qr, setQr] = useState("");
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -307,137 +312,176 @@ function KtaCard({ member, photo }: { member: Member; photo?: string }) {
     };
   }, [member]);
 
+  // The card is designed at a fixed 560x353 canvas and scaled down to fit
+  // the available width. This guarantees the exported image never clips,
+  // because the real node captured by html-to-image keeps its full size.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const update = () => {
+      const width = stage.clientWidth;
+      if (!width) return;
+      setScale(Math.min(1, width / KTA_DESIGN_WIDTH));
+    };
+
+    update();
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(update)
+        : null;
+    observer?.observe(stage);
+    window.addEventListener("resize", update);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
   return (
     <div
-      id="kta-card-node"
-      className="kta-shell box-border relative w-full max-w-[560px] overflow-hidden rounded-2xl p-4 sm:p-6"
+      ref={stageRef}
+      className="relative w-full max-w-[560px] overflow-hidden rounded-2xl"
+      style={{ aspectRatio: `${KTA_DESIGN_WIDTH} / ${KTA_DESIGN_HEIGHT}` }}
     >
-      <div className="kta-shine" />
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.05]"
+        id="kta-card-node"
+        className="kta-shell absolute left-0 top-0 box-border overflow-hidden rounded-2xl p-6"
         style={{
-          backgroundImage:
-            "radial-gradient(circle at 1px 1px, #facc15 1px, transparent 0)",
-          backgroundSize: "18px 18px",
+          width: KTA_DESIGN_WIDTH,
+          height: KTA_DESIGN_HEIGHT,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
         }}
-      />
-      <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full border border-amber-400/10" />
-      <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full border border-amber-400/10" />
-      <LogoMark
-        size={260}
-        className="pointer-events-none absolute -bottom-24 -left-16 opacity-[0.045]"
-      />
+      >
+        <div className="kta-shine" />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.05]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, #facc15 1px, transparent 0)",
+            backgroundSize: "18px 18px",
+          }}
+        />
+        <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full border border-amber-400/10" />
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full border border-amber-400/10" />
+        <LogoMark
+          size={260}
+          className="pointer-events-none absolute -bottom-24 -left-16 opacity-[0.045]"
+        />
 
-      <div className="relative flex h-full flex-col justify-between">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <LogoMark size={40} />
-            <div>
-              <p className="text-[13px] font-extrabold uppercase leading-none tracking-[0.12em]">
-                <span className="gold-text">Pusbaya Hub</span>
+        <div className="relative flex h-full flex-col justify-between">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <LogoMark size={40} />
+              <div>
+                <p className="text-[13px] font-extrabold uppercase leading-none tracking-[0.12em]">
+                  <span className="gold-text">Pusbaya Hub</span>
+                </p>
+                <p className="mt-1.5 text-[7.5px] font-semibold uppercase tracking-[0.18em] text-amber-200/50">
+                  ST Putra Settu Bhakti Jaya · Banjar Campuan
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[7px] font-bold uppercase tracking-[0.2em] text-amber-300/60">
+                Kartu Tanda
               </p>
-              <p className="mt-1.5 text-[6.5px] font-semibold uppercase tracking-[0.18em] text-amber-200/50 sm:text-[7.5px]">
-                ST Putra Settu Bhakti Jaya · Banjar Campuan
+              <p className="text-[7px] font-bold uppercase tracking-[0.2em] text-amber-300/60">
+                Anggota
               </p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-[7px] font-bold uppercase tracking-[0.2em] text-amber-300/60">
-              Kartu Tanda
-            </p>
-            <p className="text-[7px] font-bold uppercase tracking-[0.2em] text-amber-300/60">
-              Anggota
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 sm:gap-4">
-          <div className="relative shrink-0">
-            <div className="absolute inset-0 rounded-full bg-amber-400/20 blur-xl" />
-            <div className="relative flex h-[56px] w-[56px] items-center justify-center overflow-hidden rounded-full border-2 border-amber-400/50 bg-gradient-to-b from-amber-400/25 to-amber-900/20 sm:h-[74px] sm:w-[74px]">
-              {photo ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={photo}
-                  alt={`Foto ${member.nama}`}
-                  crossOrigin="anonymous"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <span className="text-xl font-extrabold tracking-wide text-amber-200 sm:text-2xl">
-                  {initials(member.nama)}
+          <div className="flex items-center gap-4">
+            <div className="relative shrink-0">
+              <div className="absolute inset-0 rounded-full bg-amber-400/20 blur-xl" />
+              <div className="relative flex h-[74px] w-[74px] items-center justify-center overflow-hidden rounded-full border-2 border-amber-400/50 bg-gradient-to-b from-amber-400/25 to-amber-900/20">
+                {photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={photo}
+                    alt={`Foto ${member.nama}`}
+                    crossOrigin="anonymous"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-2xl font-extrabold tracking-wide text-amber-200">
+                    {initials(member.nama)}
+                  </span>
+                )}
+              </div>
+              <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-amber-400/40 bg-[#12100a] text-amber-400">
+                <ShieldCheck className="h-3 w-3" />
+              </span>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="line-clamp-2 text-[17px] font-extrabold leading-[1.15] text-white">
+                {member.nama}
+              </p>
+              <p className="mt-1 font-mono text-[10.5px] font-bold tracking-[0.16em] text-amber-300/90">
+                {member.id}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[7.5px] font-bold uppercase tracking-[0.1em] text-amber-200">
+                  <MapPin className="h-2 w-2" />
+                  {member.tempekan}
                 </span>
-              )}
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[7.5px] font-bold uppercase tracking-[0.1em] text-slate-300">
+                  <BadgeCheck className="h-2 w-2" />
+                  {member.status}
+                </span>
+              </div>
             </div>
-            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-amber-400/40 bg-[#12100a] text-amber-400">
-              <ShieldCheck className="h-3 w-3" />
-            </span>
+
+            <div className="flex shrink-0 flex-col items-center">
+              <div className="rounded-lg bg-white p-1.5 shadow-lg shadow-black/40">
+                {qr ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={qr}
+                    alt={`QR KTA ${member.nama}`}
+                    crossOrigin="anonymous"
+                    className="h-[58px] w-[58px]"
+                  />
+                ) : (
+                  <div className="flex h-[58px] w-[58px] items-center justify-center bg-slate-100">
+                    <QrIcon className="h-6 w-6 text-slate-400" />
+                  </div>
+                )}
+              </div>
+              <p className="mt-1 text-[6.5px] font-bold uppercase tracking-[0.14em] text-amber-200/50">
+                Scan Verifikasi
+              </p>
+            </div>
           </div>
 
-          <div className="min-w-0 flex-1">
-            <p className="line-clamp-2 text-[13px] font-extrabold leading-[1.15] text-white sm:line-clamp-1 sm:text-[19px]">
-              {member.nama}
-            </p>
-            <p className="mt-1 font-mono text-[9px] font-bold tracking-[0.16em] text-amber-300/90 sm:text-[10.5px]">
-              {member.id}
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[6.5px] font-bold uppercase tracking-[0.1em] text-amber-200 sm:text-[7.5px]">
-                <MapPin className="h-2 w-2" />
-                {member.tempekan}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[6.5px] font-bold uppercase tracking-[0.1em] text-slate-300 sm:text-[7.5px]">
-                <BadgeCheck className="h-2 w-2" />
-                {member.status}
-              </span>
+          <div className="flex items-end justify-between gap-3 border-t border-amber-400/15 pt-3">
+            <div className="flex items-center gap-6">
+              <div>
+                <p className="text-[6.5px] font-bold uppercase tracking-[0.18em] text-amber-200/40">
+                  Bergabung
+                </p>
+                <p className="mt-0.5 flex items-center gap-1 font-mono text-[8.5px] font-semibold text-slate-300">
+                  <CalendarDays className="h-2 w-2 text-amber-400/60" />
+                  {formatDateShort(member.createdAt.slice(0, 10))}
+                </p>
+              </div>
+              <div>
+                <p className="text-[6.5px] font-bold uppercase tracking-[0.18em] text-amber-200/40">
+                  Masa Berlaku
+                </p>
+                <p className="mt-0.5 font-mono text-[8.5px] font-semibold text-slate-300">
+                  31 · 12 · 2026
+                </p>
+              </div>
             </div>
-          </div>
-
-          <div className="flex shrink-0 flex-col items-center">
-            <div className="rounded-lg bg-white p-1 shadow-lg shadow-black/40 sm:p-1.5">
-              {qr ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={qr}
-                  alt={`QR KTA ${member.nama}`}
-                  crossOrigin="anonymous"
-                  className="h-[40px] w-[40px] sm:h-[58px] sm:w-[58px]"
-                />
-              ) : (
-                <div className="flex h-[40px] w-[40px] items-center justify-center bg-slate-100 sm:h-[58px] sm:w-[58px]">
-                  <QrIcon className="h-5 w-5 text-slate-400 sm:h-6 sm:w-6" />
-                </div>
-              )}
+            <div className="flex items-center gap-1 text-[6.5px] font-bold uppercase tracking-[0.16em] text-amber-300/40">
+              <Sparkles className="h-2 w-2" />
+              Banjar Campuan · Kerobokan
             </div>
-            <p className="mt-1 text-[5.5px] font-bold uppercase tracking-[0.14em] text-amber-200/50">
-              Scan Verifikasi
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-end justify-between gap-3 border-t border-amber-400/15 pt-2.5">
-          <div className="flex items-center gap-4 sm:gap-6">
-            <div>
-              <p className="text-[5.5px] font-bold uppercase tracking-[0.18em] text-amber-200/40 sm:text-[6.5px]">
-                Bergabung
-              </p>
-              <p className="mt-0.5 flex items-center gap-1 font-mono text-[7.5px] font-semibold text-slate-300 sm:text-[8.5px]">
-                <CalendarDays className="h-2 w-2 text-amber-400/60" />
-                {formatDateShort(member.createdAt.slice(0, 10))}
-              </p>
-            </div>
-            <div>
-              <p className="text-[5.5px] font-bold uppercase tracking-[0.18em] text-amber-200/40 sm:text-[6.5px]">
-                Masa Berlaku
-              </p>
-              <p className="mt-0.5 font-mono text-[7.5px] font-semibold text-slate-300 sm:text-[8.5px]">
-                31 · 12 · 2026
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 text-[5.5px] font-bold uppercase tracking-[0.16em] text-amber-300/40 sm:text-[6.5px]">
-            <Sparkles className="h-2 w-2" />
-            Banjar Campuan · Kerobokan
           </div>
         </div>
       </div>
