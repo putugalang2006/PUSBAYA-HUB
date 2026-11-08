@@ -377,13 +377,14 @@ export function KtaCard({
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full border border-amber-400/10" />
         <LogoMark
           size={260}
+          glow={false}
           className="pointer-events-none absolute -bottom-24 -left-16 opacity-[0.045]"
         />
 
         <div className="relative flex h-full flex-col justify-between">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <LogoMark size={40} />
+              <LogoMark size={40} glow={false} />
               <div>
                 <p className="text-[13px] font-extrabold uppercase leading-none tracking-[0.12em]">
                   <span className="gold-text">Pusbaya Hub</span>
@@ -517,6 +518,33 @@ function sanitizeFileName(value: string): string {
   );
 }
 
+/** Mobile Safari can hang on a broken/slow image; never wait longer than this. */
+const KTA_IMAGE_TIMEOUT_MS = 15000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | void> {
+  return Promise.race([
+    promise,
+    new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  ]);
+}
+
+async function waitForImage(image: HTMLImageElement): Promise<void> {
+  try {
+    if (!image.complete) {
+      await new Promise<void>((resolve) => {
+        const done = () => resolve();
+        image.addEventListener("load", done, { once: true });
+        image.addEventListener("error", done, { once: true });
+      });
+    }
+    // `decode()` guarantees the pixels are ready before html-to-image clones
+    // and rasterises the card (the step that dropped the logo on iOS Safari).
+    await image.decode();
+  } catch {
+    // A failed image must not block the rest of the card export.
+  }
+}
+
 async function waitForKtaImages(node: HTMLElement): Promise<void> {
   try {
     await document.fonts.ready;
@@ -526,21 +554,7 @@ async function waitForKtaImages(node: HTMLElement): Promise<void> {
 
   const images = Array.from(node.querySelectorAll("img"));
   await Promise.all(
-    images.map(async (image) => {
-      if (image.complete) {
-        try {
-          await image.decode();
-        } catch {
-          // A failed image must not block the rest of the card export.
-        }
-        return;
-      }
-      await new Promise<void>((resolve) => {
-        const done = () => resolve();
-        image.addEventListener("load", done, { once: true });
-        image.addEventListener("error", done, { once: true });
-      });
-    }),
+    images.map((image) => withTimeout(waitForImage(image), KTA_IMAGE_TIMEOUT_MS)),
   );
 }
 
@@ -565,8 +579,13 @@ async function inlineKtaImages(node: HTMLElement): Promise<void> {
     images.map(async (image) => {
       const src = image.currentSrc || image.src;
       if (!src || src.startsWith("data:")) return;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), KTA_IMAGE_TIMEOUT_MS);
       try {
-        const response = await fetch(src, { cache: "force-cache" });
+        const response = await fetch(src, {
+          cache: "force-cache",
+          signal: controller.signal,
+        });
         if (!response.ok) return;
         const blob = await response.blob();
         if (!blob.size) return;
@@ -574,19 +593,25 @@ async function inlineKtaImages(node: HTMLElement): Promise<void> {
         image.src = dataUrl;
       } catch {
         // Keep the original src; html-to-image will still try to embed it.
+      } finally {
+        clearTimeout(timer);
       }
     }),
   );
 }
 
 async function prepareKtaNode(node: HTMLElement): Promise<void> {
-  await waitForKtaImages(node);
+  // Inline every remote source first, then make sure every image (inlined
+  // logo/photo plus the QR) has finished decoding before the capture starts.
   await inlineKtaImages(node);
+  await waitForKtaImages(node);
 }
 
 function captureOptions(node: HTMLElement) {
   const width = Math.max(1, node.offsetWidth);
   const height = Math.max(1, node.offsetHeight);
+  // Equivalent of html2canvas' `scale: 3`: always at least 3x, i.e. a
+  // 1680x1059 PNG for the 560x353 card, so nothing is ever cropped.
   const pixelRatio = Math.min(4, Math.max(3, Math.ceil(1050 / width)));
 
   return {
@@ -594,6 +619,13 @@ function captureOptions(node: HTMLElement) {
     width,
     height,
     pixelRatio,
+    // Requested cross-origin/canvas options. html-to-image reads the CORS
+    // behaviour from the <img crossOrigin> attributes (and we pre-inline the
+    // images anyway), while the timeout mirrors `imageTimeout`.
+    scale: 3,
+    useCORS: true,
+    allowTaint: true,
+    imageTimeout: KTA_IMAGE_TIMEOUT_MS,
     style: {
       transform: "none",
       transformOrigin: "top left",

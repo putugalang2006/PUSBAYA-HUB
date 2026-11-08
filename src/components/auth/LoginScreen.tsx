@@ -20,6 +20,7 @@ import { APP_SUBTITLE } from "@/lib/constants";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { compressProfilePhoto } from "@/lib/image";
+import { LOGO_STT_DATA_URL } from "@/lib/logoData";
 import { LogoLockup } from "@/components/ui/Logo";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 
@@ -190,7 +191,7 @@ export function LoginScreen({
         <div className="absolute left-[4%] top-1/2 hidden w-[min(58vw,620px)] -translate-y-1/2 lg:block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo-stt.png"
+            src={LOGO_STT_DATA_URL}
             alt=""
             aria-hidden="true"
             className="login-watermark w-full max-w-none blur-[42px] saturate-150"

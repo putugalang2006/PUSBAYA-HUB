@@ -1,5 +1,6 @@
 import type { Member } from "@/lib/types";
 import { formatDateShort, formatNumber } from "@/lib/utils";
+import { LOGO_STT_DATA_URL } from "@/lib/logoData";
 
 const BG = [8, 9, 12] as const;
 const SURFACE = [15, 16, 21] as const;
@@ -26,19 +27,8 @@ const COLUMNS = [
 ] as const;
 
 async function loadLogo(): Promise<string | null> {
-  try {
-    const response = await fetch("/logo-stt.png");
-    if (!response.ok) return null;
-    const blob = await response.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
+  // Use the inlined base64 logo directly; no file/network request needed.
+  return LOGO_STT_DATA_URL;
 }
 
 export async function downloadMembersPdf(members: Member[]): Promise<void> {
