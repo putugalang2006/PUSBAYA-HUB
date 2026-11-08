@@ -53,8 +53,9 @@ npm start
 
 ## Modul
 
-1. **Dashboard** — banner, registrasi anggota (sekali per akun pengguna), status
-   keanggotaan terverifikasi, KPI, distribusi per tempekan.
+1. **Dashboard** — pengguna baru langsung diarahkan untuk mengisi formulir
+   registrasi anggota sebelum dashboard lengkap tampil; setelah terdaftar,
+   dashboard menampilkan KPI, status keanggotaan, dan distribusi per tempekan.
 2. **Daftar Pengguna** — pencarian, filter tempekan/status/usia, tabel anggota,
    modal edit, hapus, export CSV.
 3. **Absensi Digital** — sesi sangkep, status HADIR/IZIN/ALPHA, simulator scan

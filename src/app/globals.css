@@ -598,6 +598,61 @@ select.field option {
     transform: translateX(460%) rotate(14deg);
   }
 }
+@keyframes landing-scene {
+  0%,
+  100% {
+    transform: scale(1.06) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.12) translate3d(-1.4%, -1%, 0);
+  }
+}
+@keyframes bg-aurora {
+  0%,
+  100% {
+    opacity: 0.08;
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    opacity: 0.17;
+    transform: rotate(180deg) scale(1.12);
+  }
+}
+@keyframes landing-mote {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0) scale(0.65);
+  }
+  16% {
+    opacity: 0.8;
+  }
+  55% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(18px, -110px, 0) scale(1.15);
+  }
+}
+@keyframes login-watermark {
+  0%,
+  100% {
+    opacity: 0.05;
+    transform: translate3d(0, 0, 0) scale(1) rotate(-1deg);
+  }
+  50% {
+    opacity: 0.085;
+    transform: translate3d(0, -12px, 0) scale(1.05) rotate(1deg);
+  }
+}
+@keyframes login-orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .animate-fade-up {
   animation: fade-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -636,6 +691,49 @@ select.field option {
 }
 .landing-sweep {
   animation: landing-sweep 16s ease-in-out infinite;
+}
+.landing-scene {
+  animation: landing-scene 32s ease-in-out infinite;
+  will-change: transform;
+}
+.bg-aurora {
+  opacity: 0.1;
+  animation: bg-aurora 38s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+.landing-mote {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    #fff7cc 0%,
+    #facc15 45%,
+    rgba(250, 204, 21, 0) 72%
+  );
+  box-shadow: 0 0 10px 2px rgba(250, 204, 21, 0.28);
+  opacity: 0;
+  animation-name: landing-mote;
+  animation-duration: 12s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+.login-watermark {
+  opacity: 0.06;
+  animation: login-watermark 14s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+.login-orbit {
+  translate: 0 -50%;
+  animation: login-orbit 34s linear infinite;
+  will-change: transform;
+}
+.login-orbit-reverse {
+  translate: 0 -50%;
+  animation: login-orbit 48s linear infinite reverse;
+  will-change: transform;
 }
 
 /* Landing call-to-action controls — metallic gold and smoked glass */

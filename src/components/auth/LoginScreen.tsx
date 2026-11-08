@@ -25,6 +25,18 @@ import { UserAvatar } from "@/components/ui/UserAvatar";
 
 type UserMode = "login" | "register";
 
+const LOGIN_MOTES = [
+  { left: "6%", top: "72%", delay: "0s", duration: "14s", size: 3 },
+  { left: "14%", top: "36%", delay: "3.2s", duration: "17s", size: 2 },
+  { left: "26%", top: "84%", delay: "6.1s", duration: "15s", size: 3 },
+  { left: "38%", top: "22%", delay: "1.8s", duration: "19s", size: 2 },
+  { left: "49%", top: "78%", delay: "7.4s", duration: "16s", size: 2 },
+  { left: "62%", top: "30%", delay: "4.6s", duration: "18s", size: 3 },
+  { left: "74%", top: "86%", delay: "9.2s", duration: "15s", size: 2 },
+  { left: "85%", top: "48%", delay: "5.5s", duration: "17s", size: 3 },
+  { left: "93%", top: "74%", delay: "11.3s", duration: "14s", size: 2 },
+];
+
 export function LoginScreen({
   onSuccess,
   onBack,
@@ -142,20 +154,47 @@ export function LoginScreen({
       <div className="app-backdrop" />
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-[58%] top-[44%] h-[120vmin] w-[120vmin] -translate-x-1/2 -translate-y-1/2 sm:h-[130vmin] sm:w-[130vmin]">
+          <div
+            className="bg-aurora absolute inset-0 rounded-full blur-[80px] sm:blur-[100px]"
+            style={{
+              background:
+                "conic-gradient(from 210deg, transparent 0deg, rgba(250,204,21,0.32) 54deg, transparent 142deg, transparent 212deg, rgba(255,255,255,0.11) 272deg, transparent 350deg)",
+            }}
+          />
+        </div>
+
         <div className="landing-float-a absolute -left-36 top-10 h-[460px] w-[460px] rounded-full bg-amber-500/[0.055] blur-[100px]" />
         <div className="landing-float-b absolute -right-40 bottom-0 h-[520px] w-[520px] rounded-full bg-yellow-600/[0.045] blur-[110px]" />
 
-        <div className="absolute left-[4%] top-1/2 hidden w-[min(58vw,620px)] -translate-y-1/2 opacity-[0.055] lg:block">
+        <div className="absolute left-[4%] top-1/2 hidden w-[min(58vw,620px)] -translate-y-1/2 lg:block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-stt.png"
             alt=""
             aria-hidden="true"
-            className="w-full max-w-none blur-[42px] saturate-150"
+            className="login-watermark w-full max-w-none blur-[42px] saturate-150"
           />
         </div>
-        <div className="absolute left-[10%] top-1/2 hidden h-[560px] w-[560px] -translate-y-1/2 rounded-full border border-amber-400/[0.05] lg:block" />
-        <div className="absolute left-[16%] top-1/2 hidden h-[400px] w-[400px] -translate-y-1/2 rounded-full border border-white/[0.035] lg:block" />
+        <div className="login-orbit absolute left-[10%] top-1/2 hidden h-[560px] w-[560px] rounded-full border border-white/[0.035] border-t-amber-400/20 lg:block" />
+        <div className="login-orbit-reverse absolute left-[16%] top-1/2 hidden h-[400px] w-[400px] rounded-full border border-white/[0.03] border-b-amber-400/15 lg:block" />
+
+        <div className="landing-sweep absolute -top-1/4 bottom-1/4 left-0 w-[38%] bg-gradient-to-r from-transparent via-amber-300/[0.05] to-transparent blur-2xl" />
+
+        {LOGIN_MOTES.map((mote, index) => (
+          <span
+            key={index}
+            className="landing-mote"
+            style={{
+              left: mote.left,
+              top: mote.top,
+              width: mote.size,
+              height: mote.size,
+              animationDelay: mote.delay,
+              animationDuration: mote.duration,
+            }}
+          />
+        ))}
 
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_28%,rgba(7,8,11,0.52)_100%)]" />
       </div>

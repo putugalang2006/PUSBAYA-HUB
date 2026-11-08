@@ -3,6 +3,21 @@
 import { ArrowRight, ShieldCheck, UserPlus, UserRound } from "lucide-react";
 import { LogoMark } from "@/components/ui/Logo";
 
+const LANDING_MOTES = [
+  { left: "7%", top: "76%", delay: "0s", duration: "13s", size: 3 },
+  { left: "15%", top: "58%", delay: "2.4s", duration: "16s", size: 2 },
+  { left: "24%", top: "82%", delay: "5.1s", duration: "14s", size: 4 },
+  { left: "34%", top: "64%", delay: "1.2s", duration: "18s", size: 2 },
+  { left: "45%", top: "86%", delay: "7.3s", duration: "15s", size: 3 },
+  { left: "56%", top: "70%", delay: "3.6s", duration: "17s", size: 2 },
+  { left: "66%", top: "80%", delay: "8.4s", duration: "14s", size: 4 },
+  { left: "76%", top: "62%", delay: "4.8s", duration: "19s", size: 2 },
+  { left: "86%", top: "78%", delay: "6.2s", duration: "13s", size: 3 },
+  { left: "92%", top: "54%", delay: "9.1s", duration: "16s", size: 2 },
+  { left: "29%", top: "42%", delay: "10.4s", duration: "18s", size: 2 },
+  { left: "71%", top: "38%", delay: "11.8s", duration: "15s", size: 3 },
+];
+
 export function LandingPage({ onEnter }: { onEnter: () => void }) {
   return (
     <main className="relative flex h-[100svh] min-h-[540px] flex-col overflow-hidden">
@@ -15,7 +30,7 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
           src="/landing-bg.jpg"
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 h-full w-full scale-[1.03] object-cover object-[center_48%]"
+          className="landing-scene absolute inset-0 h-full w-full object-cover object-[center_48%]"
           style={{
             filter: "brightness(0.64) contrast(1.06) saturate(0.9)",
           }}
@@ -26,9 +41,33 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_64%_58%_at_50%_45%,rgba(8,9,12,0.78)_0%,rgba(8,9,12,0.52)_48%,rgba(8,9,12,0.18)_72%,transparent_100%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,9,12,0.62)_0%,transparent_26%,transparent_74%,rgba(8,9,12,0.62)_100%)]" />
 
+        <div className="absolute left-1/2 top-1/2 h-[150vmin] w-[150vmin] -translate-x-1/2 -translate-y-1/2">
+          <div
+            className="bg-aurora absolute inset-0 rounded-full blur-[90px]"
+            style={{
+              background:
+                "conic-gradient(from 40deg, transparent 0deg, rgba(250,204,21,0.34) 58deg, transparent 148deg, transparent 218deg, rgba(255,255,255,0.12) 280deg, transparent 350deg)",
+            }}
+          />
+        </div>
         <div className="landing-float-a absolute -left-[18%] top-[6%] h-[58vmin] w-[58vmin] rounded-full bg-amber-500/10 blur-[90px]" />
         <div className="landing-float-b absolute -right-[12%] bottom-[2%] h-[66vmin] w-[66vmin] rounded-full bg-yellow-400/[0.08] blur-[100px]" />
         <div className="landing-sweep absolute -top-1/4 bottom-1/4 left-0 w-[32%] bg-gradient-to-r from-transparent via-amber-300/[0.06] to-transparent blur-2xl" />
+
+        {LANDING_MOTES.map((mote, index) => (
+          <span
+            key={index}
+            className="landing-mote"
+            style={{
+              left: mote.left,
+              top: mote.top,
+              width: mote.size,
+              height: mote.size,
+              animationDelay: mote.delay,
+              animationDuration: mote.duration,
+            }}
+          />
+        ))}
 
         <div
           className="absolute inset-0 opacity-[0.02]"

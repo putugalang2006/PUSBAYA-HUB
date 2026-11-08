@@ -56,10 +56,158 @@ export function DashboardView({
     };
   }, [members]);
 
+  const needsRegistration = !isAdmin && !isRegistered;
+  const showDashboardContent = !isAdmin || members.length > 0;
+
+  if (needsRegistration) {
+    return (
+      <div className="mx-auto w-full max-w-3xl">
+        <section className="panel animate-fade-up relative overflow-hidden p-5 sm:p-7">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-amber-400/[0.08] blur-3xl" />
+            <div className="absolute bottom-0 left-1/4 h-32 w-64 rounded-full bg-yellow-600/[0.05] blur-3xl" />
+          </div>
+
+          <div className="relative">
+            <div className="flex items-start gap-3.5">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-400/10 text-amber-400">
+                <UserPlus className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <span className="badge badge-gold">Registrasi Wajib</span>
+                <h2 className="mt-2 text-balance text-xl font-extrabold leading-tight tracking-[-0.02em] text-white sm:text-2xl">
+                  Lengkapi data anggota Anda terlebih dahulu
+                </h2>
+                <p className="mt-1.5 text-[12px] leading-relaxed text-slate-400 sm:text-[13px]">
+                  Halo{" "}
+                  <span className="font-semibold text-slate-200">
+                    {auth?.name ?? "Pengguna"}
+                  </span>
+                  , isi formulir di bawah ini untuk mengaktifkan dashboard dan
+                  KTA digital Anda.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 hidden grid-cols-1 gap-2 sm:grid sm:grid-cols-3">
+              {[
+                { icon: UserRound, title: "Data diri", desc: "Identitas & kontak" },
+                { icon: IdCard, title: "KTA otomatis", desc: "Terbit setelah disimpan" },
+                { icon: BadgeCheck, title: "Akses dashboard", desc: "Modul langsung terbuka" },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-amber-400/15 bg-amber-400/[0.07] text-amber-400/90">
+                    <item.icon className="h-3.5 w-3.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold text-slate-200">
+                      {item.title}
+                    </p>
+                    <p className="mt-0.5 text-[8.5px] text-slate-500">
+                      {item.desc}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-amber-400/[0.12] bg-black/25 p-4 sm:p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[8.5px] font-bold uppercase tracking-[0.18em] text-amber-400/80">
+                    Formulir Registrasi
+                  </p>
+                  <h3 className="mt-0.5 text-[14px] font-bold text-white">
+                    Data Anggota Baru
+                  </h3>
+                </div>
+                <span className="badge badge-gold">1 akun · 1 anggota</span>
+              </div>
+
+              <MemberForm
+                compact
+                submitLabel="Daftarkan Saya"
+                onSubmit={(input) => {
+                  const created = addMember(input);
+                  if (!created) return;
+                  pushToast(
+                    "success",
+                    "Registrasi Berhasil!",
+                    "KTA Digital Anda telah terbit.",
+                  );
+                }}
+              />
+            </div>
+
+            <p className="mt-4 rounded-lg border border-amber-400/10 bg-amber-400/[0.04] px-3 py-2.5 text-[10px] leading-relaxed text-amber-200/60">
+              Pastikan data sudah benar. Setelah tersimpan, dashboard lengkap
+              dan KTA digital akan otomatis terbuka.
+            </p>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      {/* Hero */}
-      <section className="panel animate-fade-up relative overflow-hidden p-0">
+      {isAdmin && (
+        <section className="panel animate-fade-up relative overflow-hidden p-5 sm:p-6">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-amber-400/[0.08] blur-3xl" />
+            <div className="absolute bottom-0 left-1/4 h-32 w-64 rounded-full bg-yellow-600/[0.05] blur-3xl" />
+          </div>
+
+          <div className="relative grid gap-5 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
+            <div>
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-amber-400">
+                  <UserPlus className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-[8.5px] font-bold uppercase tracking-[0.18em] text-amber-400/80">
+                    Registrasi Anggota
+                  </p>
+                  <h2 className="mt-0.5 text-[17px] font-bold text-white">
+                    Registrasi Anggota Baru
+                  </h2>
+                </div>
+              </div>
+              <p className="mt-3 max-w-md text-[11.5px] leading-relaxed text-slate-400">
+                Isi formulir registrasi berikut. Data akan langsung tersimpan
+                dan tersinkron ke dashboard, absensi, serta KTA digital.
+              </p>
+              <p className="mt-3 hidden rounded-lg border border-amber-400/10 bg-amber-400/[0.04] px-3 py-2.5 text-[10px] leading-relaxed text-amber-200/60 lg:block">
+                Formulir ini selalu berada di bagian paling atas dashboard agar
+                registrasi anggota baru lebih cepat dilakukan.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-amber-400/[0.12] bg-black/25 p-4 sm:p-5">
+              <MemberForm
+                submitLabel="Daftarkan Anggota"
+                onSubmit={(input) => {
+                  const created = addMember(input);
+                  if (!created) return;
+                  pushToast(
+                    "success",
+                    "Anggota berhasil didaftarkan",
+                    `${created.nama} · ${created.id} · ${created.tempekan}`,
+                  );
+                }}
+              />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {showDashboardContent && (
+        <>
+          {/* Hero */}
+          <section className="panel animate-fade-up relative overflow-hidden p-0">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-amber-400/[0.09] blur-3xl" />
           <div className="absolute bottom-0 left-1/3 h-40 w-72 rounded-full bg-yellow-600/[0.06] blur-3xl" />
@@ -159,63 +307,24 @@ export function DashboardView({
         />
       </section>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        {/* Registration / membership status */}
-        <section
-          className="panel animate-fade-up p-5 sm:p-6"
-          style={{ animationDelay: "140ms" }}
-        >
-          {isRegistered && registeredMember ? (
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-5",
+          !isAdmin && "xl:grid-cols-[0.9fr_1.1fr]",
+        )}
+      >
+        {/* Membership status */}
+        {!isAdmin && isRegistered && registeredMember && (
+          <section
+            className="panel animate-fade-up p-5 sm:p-6"
+            style={{ animationDelay: "140ms" }}
+          >
             <RegisteredMemberCard
               member={registeredMember}
               onNavigate={onNavigate}
             />
-          ) : (
-            <>
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-amber-400">
-                    <UserPlus className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <h3 className="text-[15px] font-bold text-white">
-                      Registrasi Anggota Baru
-                    </h3>
-                    <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-400">
-                      Data langsung tersimpan dan masuk ke seluruh modul.
-                    </p>
-                  </div>
-                </div>
-                <span className="badge badge-gold hidden shrink-0 sm:inline-flex">
-                  {isAdmin ? "Admin" : "Pengguna"}
-                </span>
-              </div>
-
-              <MemberForm
-                compact
-                submitLabel="Daftarkan Anggota"
-                onSubmit={(input) => {
-                  const created = addMember(input);
-                  if (!created) return;
-                  pushToast(
-                    "success",
-                    isAdmin ? "Anggota berhasil didaftarkan" : "Registrasi Berhasil!",
-                    isAdmin
-                      ? `${created.nama} · ${created.id} · ${created.tempekan}`
-                      : "KTA Digital Anda telah terbit.",
-                  );
-                }}
-              />
-
-              {!isAdmin && (
-                <p className="mt-4 rounded-lg border border-amber-400/10 bg-amber-400/[0.04] px-3 py-2.5 text-[10px] leading-relaxed text-amber-200/60">
-                  Registrasi hanya dapat dilakukan satu kali per akun. Pastikan
-                  data yang diisi sudah benar.
-                </p>
-              )}
-            </>
-          )}
-        </section>
+          </section>
+        )}
 
         {/* Distribution */}
         <section
@@ -301,6 +410,8 @@ export function DashboardView({
           </div>
         </section>
       </div>
+        </>
+      )}
     </div>
   );
 }
