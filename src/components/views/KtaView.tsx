@@ -282,7 +282,15 @@ function DetailRow({
 const KTA_DESIGN_WIDTH = 560;
 const KTA_DESIGN_HEIGHT = 353;
 
-function KtaCard({ member, photo }: { member: Member; photo?: string }) {
+export function KtaCard({
+  member,
+  photo,
+  nodeId = "kta-card-node",
+}: {
+  member: Member;
+  photo?: string;
+  nodeId?: string;
+}) {
   const [qr, setQr] = useState("");
   const stageRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -347,7 +355,7 @@ function KtaCard({ member, photo }: { member: Member; photo?: string }) {
       style={{ aspectRatio: `${KTA_DESIGN_WIDTH} / ${KTA_DESIGN_HEIGHT}` }}
     >
       <div
-        id="kta-card-node"
+        id={nodeId}
         className="kta-shell absolute left-0 top-0 box-border overflow-hidden rounded-2xl p-6"
         style={{
           width: KTA_DESIGN_WIDTH,
@@ -619,12 +627,14 @@ async function dataUrlToPngFile(
   return new File([blob], fileName, { type: "image/png" });
 }
 
-function DownloadButton({
+export function DownloadButton({
   member,
   format,
+  nodeId = "kta-card-node",
 }: {
   member: Member;
   format: "png" | "pdf";
+  nodeId?: string;
 }) {
   const { pushToast } = useApp();
   const [downloading, setDownloading] = useState(false);
@@ -637,7 +647,7 @@ function DownloadButton({
   const baseFileName = `KTA-${member.id}-${safeName}`;
 
   const handleDownload = async () => {
-    const node = document.getElementById("kta-card-node");
+    const node = document.getElementById(nodeId);
     if (!node) return;
     setDownloading(true);
     try {

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   Download,
   FilterX,
+  IdCard,
   Lock,
   MapPin,
   MessageCircle,
@@ -23,6 +24,7 @@ import type { Member, PageKey } from "@/lib/types";
 import { downloadMembersPdf } from "@/lib/memberPdf";
 import { cn, formatNumber, initials } from "@/lib/utils";
 import { MemberForm } from "@/components/members/MemberForm";
+import { KtaPreviewModal } from "@/components/members/KtaPreviewModal";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -49,6 +51,7 @@ export function MembersView({
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Member | null>(null);
   const [deleting, setDeleting] = useState<Member | null>(null);
+  const [previewing, setPreviewing] = useState<Member | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
 
   const filtered = useMemo(() => {
@@ -369,6 +372,15 @@ export function MembersView({
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"
+                              onClick={() => setPreviewing(member)}
+                              className="btn btn-outline btn-sm"
+                              title={`Lihat KTA ${member.nama}`}
+                            >
+                              <IdCard className="h-3 w-3" />
+                              KTA
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => setEditing(member)}
                               className="btn btn-outline btn-sm"
                               title={`Edit ${member.nama}`}
@@ -464,6 +476,12 @@ export function MembersView({
           />
         )}
       </Modal>
+
+      <KtaPreviewModal
+        member={previewing}
+        open={Boolean(previewing)}
+        onClose={() => setPreviewing(null)}
+      />
 
       <ConfirmDialog
         open={Boolean(deleting)}
