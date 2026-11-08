@@ -536,13 +536,52 @@ async function waitForKtaImages(node: HTMLElement): Promise<void> {
   );
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Gagal membaca data gambar."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Converts every non-data-URL image inside the card into an inline data URL
+ * before the export runs. This makes the download independent from the
+ * network and from `html-to-image`'s image fetcher, which is the part that
+ * could drop the STT logo (the only image served over HTTP) on some browsers.
+ */
+async function inlineKtaImages(node: HTMLElement): Promise<void> {
+  const images = Array.from(node.querySelectorAll("img"));
+  await Promise.all(
+    images.map(async (image) => {
+      const src = image.currentSrc || image.src;
+      if (!src || src.startsWith("data:")) return;
+      try {
+        const response = await fetch(src, { cache: "force-cache" });
+        if (!response.ok) return;
+        const blob = await response.blob();
+        if (!blob.size) return;
+        const dataUrl = await blobToDataUrl(blob);
+        image.src = dataUrl;
+      } catch {
+        // Keep the original src; html-to-image will still try to embed it.
+      }
+    }),
+  );
+}
+
+async function prepareKtaNode(node: HTMLElement): Promise<void> {
+  await waitForKtaImages(node);
+  await inlineKtaImages(node);
+}
+
 function captureOptions(node: HTMLElement) {
   const width = Math.max(1, node.offsetWidth);
   const height = Math.max(1, node.offsetHeight);
   const pixelRatio = Math.min(4, Math.max(3, Math.ceil(1050 / width)));
 
   return {
-    cacheBust: true,
     backgroundColor: "#0a0b0e",
     width,
     height,
@@ -557,7 +596,7 @@ function captureOptions(node: HTMLElement) {
 }
 
 async function renderKtaPng(node: HTMLElement): Promise<string> {
-  await waitForKtaImages(node);
+  await prepareKtaNode(node);
   return toPng(node, captureOptions(node));
 }
 
@@ -661,7 +700,7 @@ function DownloadButton({
         return;
       }
 
-      await waitForKtaImages(node);
+      await prepareKtaNode(node);
       const dataUrl = await toJpeg(node, {
         ...captureOptions(node),
         quality: 0.95,
