@@ -51,6 +51,7 @@ export function LoginScreen({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [photo, setPhoto] = useState("");
+  const [photoName, setPhotoName] = useState("");
   const [photoBusy, setPhotoBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -80,6 +81,7 @@ export function LoginScreen({
     try {
       const dataUrl = await fileToAvatarDataUrl(file);
       setPhoto(dataUrl);
+      setPhotoName(file.name);
     } catch (photoError) {
       setError(
         photoError instanceof Error
@@ -122,6 +124,7 @@ export function LoginScreen({
           username,
           password,
           photo: photo || undefined,
+          photoName: photoName || undefined,
         });
         if (!result.ok) {
           setError(result.error ?? "Registrasi gagal. Coba lagi.");
@@ -399,7 +402,10 @@ export function LoginScreen({
                             {photo && (
                               <button
                                 type="button"
-                                onClick={() => setPhoto("")}
+                                onClick={() => {
+                                  setPhoto("");
+                                  setPhotoName("");
+                                }}
                                 className="btn btn-ghost btn-sm text-red-400/80 hover:text-red-300"
                               >
                                 <Trash2 className="h-3 w-3" />

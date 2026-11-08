@@ -10,12 +10,14 @@ create table if not exists public.users (
   username text not null unique,
   password text not null,
   photo_url text,
+  profile_picture text,
   role text not null default 'PENGGUNA',
   created_at timestamptz not null default now()
 );
 
 -- Pastikan kolom baru tetap ada jika tabel sudah dibuat sebelumnya.
 alter table public.users add column if not exists photo_url text;
+alter table public.users add column if not exists profile_picture text;
 alter table public.users add column if not exists role text not null default 'PENGGUNA';
 alter table public.users add column if not exists created_at timestamptz not null default now();
 

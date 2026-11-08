@@ -23,7 +23,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 /**
  * Reads an uploaded profile photo, crops it to a centered square and
- * compresses it to a small JPEG data URL so it fits comfortably in LocalStorage.
+ * compresses it to a small JPEG data URL before it is uploaded to Supabase
+ * Storage and its public URL is saved on the user row.
  */
 export async function fileToAvatarDataUrl(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {

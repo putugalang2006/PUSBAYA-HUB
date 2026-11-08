@@ -19,6 +19,7 @@ type DbUserRow = {
   username: string;
   password: string;
   photo_url?: string | null;
+  profile_picture?: string | null;
   role?: string | null;
   created_at?: string | null;
 };
@@ -75,7 +76,7 @@ function normalizeUserRow(row: DbUserRow): DbUser {
     id: row.id,
     username: row.username,
     password: row.password,
-    photo: row.photo_url ?? undefined,
+    photo: row.profile_picture ?? row.photo_url ?? undefined,
     role: row.role?.toUpperCase() === "ADMIN" ? "ADMIN" : "PENGGUNA",
     createdAt: row.created_at ?? new Date().toISOString(),
   };
@@ -118,20 +119,39 @@ export async function usernameExists(username: string): Promise<boolean> {
   return Boolean(data);
 }
 
+function sanitizeStorageName(value: string): string {
+  const cleaned = value
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/^[._-]+|[._-]+$/g, "")
+    .slice(0, 80);
+  return cleaned || "profile";
+}
+
 export async function uploadProfilePhoto(
   dataUrl: string,
   username: string,
+  originalName?: string,
 ): Promise<string> {
   assertSupabaseConfigured();
   const response = await fetch(dataUrl);
   const blob = await response.blob();
   if (!blob.size) throw new Error("File foto profil kosong.");
 
+  const mimeExtension = blob.type.split("/")[1]?.toLowerCase();
   const extension =
-    blob.type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
-  const filePath = `${username
-    .trim()
-    .toLowerCase()}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+    mimeExtension === "jpeg"
+      ? "jpg"
+      : mimeExtension && /^[a-z0-9]+$/.test(mimeExtension)
+        ? mimeExtension
+        : "jpg";
+  const originalBase = (originalName || username).replace(/\.[^./\\]+$/, "");
+  const safeBase = sanitizeStorageName(originalBase);
+  // Keep the object key flat and clean: no leading slash, spaces, quotes,
+  // hashes, question marks, or other characters that break Storage URLs.
+  const fileName = `${Date.now()}_${safeBase}.${extension}`;
+  const filePath = fileName.replace(/^\/+/, "");
+
   const { error } = await supabase.storage
     .from("profile-pictures")
     .upload(filePath, blob, {
@@ -156,27 +176,43 @@ export async function insertUser(input: {
   photoUrl?: string;
 }): Promise<UserAccount> {
   assertSupabaseConfigured();
-  const { data, error } = await supabase
-    .from("users")
-    .insert({
-      username: input.username.trim().toLowerCase(),
-      password: input.password,
-      photo_url: input.photoUrl ?? null,
-      role: "PENGGUNA",
-    })
-    .select("*")
-    .single();
-
-  if (error) throw new Error(error.message);
-
-  const row = normalizeUserRow(data as DbUserRow);
-  return {
-    id: row.id,
-    username: row.username,
-    password: row.password,
-    photo: row.photo,
-    createdAt: row.createdAt,
+  const base = {
+    username: input.username.trim().toLowerCase(),
+    password: input.password,
+    role: "PENGGUNA",
   };
+  const attempts: Array<Record<string, string | null>> = [
+    { ...base, profile_picture: input.photoUrl ?? null },
+    { ...base, photo_url: input.photoUrl ?? null },
+  ];
+
+  let lastError = "Gagal menyimpan akun ke Supabase.";
+  for (const payload of attempts) {
+    const { data, error } = await supabase
+      .from("users")
+      .insert(payload)
+      .select("*")
+      .single();
+
+    if (!error) {
+      const row = normalizeUserRow(data as DbUserRow);
+      return {
+        id: row.id,
+        username: row.username,
+        password: row.password,
+        photo: row.photo,
+        createdAt: row.createdAt,
+      };
+    }
+
+    lastError = error.message;
+    const missingProfileColumn =
+      error.message.toLowerCase().includes("profile_picture") &&
+      /column|schema cache|does not exist/i.test(error.message);
+    if (!missingProfileColumn) break;
+  }
+
+  throw new Error(lastError);
 }
 
 export async function insertMember(input: {

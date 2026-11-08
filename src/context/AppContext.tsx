@@ -60,6 +60,7 @@ interface AppContextValue {
     username: string;
     password: string;
     photo?: string;
+    photoName?: string;
   }) => Promise<LoginResult>;
   logout: () => void;
 
@@ -319,6 +320,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       username: string;
       password: string;
       photo?: string;
+      photoName?: string;
     }): Promise<LoginResult> => {
       const username = input.username.trim().toLowerCase();
       if (username.length < 3) {
@@ -358,7 +360,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         let photoUrl: string | undefined;
         if (input.photo) {
           try {
-            photoUrl = await uploadProfilePhoto(input.photo, username);
+            photoUrl = await uploadProfilePhoto(
+              input.photo,
+              username,
+              input.photoName,
+            );
           } catch (error) {
             return {
               ok: false,
