@@ -14,7 +14,6 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
-import { toJpeg, toPng } from "html-to-image";
 import QRCode from "qrcode";
 import { useApp } from "@/context/AppContext";
 import type { Member, PageKey } from "@/lib/types";
@@ -25,8 +24,6 @@ import {
 } from "@/lib/utils";
 import { LogoMark } from "@/components/ui/Logo";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Modal } from "@/components/ui/Modal";
-import { DEFAULT_AVATAR_DATA_URL, urlToBase64 } from "@/lib/image";
 import { LOGO_STT_DATA_URL } from "@/lib/logoData";
 
 export function KtaView({
@@ -287,11 +284,9 @@ const KTA_DESIGN_HEIGHT = 353;
 export function KtaCard({
   member,
   photo,
-  nodeId = "kta-card-node",
 }: {
   member: Member;
   photo?: string;
-  nodeId?: string;
 }) {
   const [qr, setQr] = useState("");
   const stageRef = useRef<HTMLDivElement>(null);
@@ -323,9 +318,9 @@ export function KtaCard({
     };
   }, [member]);
 
-  // The card is designed at a fixed 560x353 canvas and scaled down to fit
-  // the available width. This guarantees the exported image never clips,
-  // because the real node captured by html-to-image keeps its full size.
+  // The card is designed at a fixed 560x353 canvas and scaled down to fit the
+  // available width. The downloadable PNG/PDF is rendered on the server at
+  // 1050x630 (see `/api/kta/[id]`), so this on-screen card is a live preview.
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -357,7 +352,6 @@ export function KtaCard({
       style={{ aspectRatio: `${KTA_DESIGN_WIDTH} / ${KTA_DESIGN_HEIGHT}` }}
     >
       <div
-        id={nodeId}
         className="kta-shell absolute left-0 top-0 box-border overflow-hidden rounded-2xl p-6"
         style={{
           width: KTA_DESIGN_WIDTH,
@@ -539,273 +533,78 @@ function sanitizeFileName(value: string): string {
   );
 }
 
-/** Mobile Safari can hang on a broken/slow image; never wait longer than this. */
-const KTA_IMAGE_TIMEOUT_MS = 15000;
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | void> {
-  return Promise.race([
-    promise,
-    new Promise<void>((resolve) => setTimeout(resolve, ms)),
-  ]);
-}
-
-async function waitForImage(image: HTMLImageElement): Promise<void> {
-  try {
-    if (!image.complete) {
-      await new Promise<void>((resolve) => {
-        const done = () => resolve();
-        image.addEventListener("load", done, { once: true });
-        image.addEventListener("error", done, { once: true });
-      });
-    }
-    // `decode()` guarantees the pixels are ready before html-to-image clones
-    // and rasterises the card (the step that dropped the logo on iOS Safari).
-    await image.decode();
-  } catch {
-    // A failed image must not block the rest of the card export.
-  }
-}
-
-async function waitForKtaImages(node: HTMLElement): Promise<void> {
-  try {
-    await document.fonts.ready;
-  } catch {
-    // Font embedding can continue even if the font set is unavailable.
-  }
-
-  const images = Array.from(node.querySelectorAll("img"));
-  await Promise.all(
-    images.map((image) => withTimeout(waitForImage(image), KTA_IMAGE_TIMEOUT_MS)),
-  );
-}
-
-type KtaImageBackup = {
-  image: HTMLImageElement;
-  src: string;
-  crossOrigin: string | null;
-};
-
-/**
- * Converts every remote image inside the card (the STT logo when served over
- * HTTP, and the Supabase Storage profile photo) into an inline Base64 data URL
- * before the export runs:
- *
- *   1. `urlToBase64()` fetches the source and encodes it as `data:image/...`.
- *   2. The Base64 string is written straight into the `<img src="...">`.
- *   3. `waitForKtaImages()` then awaits `decode()` so the pixels are ready.
- *
- * If a profile photo cannot be fetched (offline/CORS/broken URL) a local
- * Base64 avatar is substituted, so the card is never exported with an empty
- * photo slot. The original attributes are restored afterwards, so the
- * on-screen card is left exactly as it was.
- *
- * Returns a `restore()` callback that puts every original `src` back.
- */
-async function inlineKtaImages(node: HTMLElement): Promise<() => void> {
-  const images = Array.from(node.querySelectorAll("img"));
-  const backups: KtaImageBackup[] = [];
-
-  await Promise.all(
-    images.map(async (image) => {
-      const originalSrc = image.getAttribute("src") ?? "";
-      const source = image.currentSrc || image.src;
-      if (!source || source.startsWith("data:")) return;
-
-      backups.push({
-        image,
-        src: originalSrc,
-        crossOrigin: image.getAttribute("crossorigin"),
-      });
-
-      let dataUrl: string | null = null;
-      try {
-        dataUrl = await urlToBase64(source, { timeoutMs: KTA_IMAGE_TIMEOUT_MS });
-      } catch {
-        dataUrl = null;
-      }
-
-      // A missing profile photo falls back to the local avatar; any other
-      // image simply keeps its original source.
-      if (!dataUrl && image.dataset.ktaRole === "photo") {
-        dataUrl = DEFAULT_AVATAR_DATA_URL;
-      }
-      if (!dataUrl) return;
-
-      image.removeAttribute("crossorigin");
-      image.src = dataUrl;
-    }),
-  );
-
-  return () => {
-    for (const backup of backups) {
-      if (backup.crossOrigin !== null) {
-        backup.image.setAttribute("crossorigin", backup.crossOrigin);
-      } else {
-        backup.image.removeAttribute("crossorigin");
-      }
-      backup.image.setAttribute("src", backup.src);
-    }
-  };
-}
-
-async function prepareKtaNode(node: HTMLElement): Promise<() => void> {
-  // Inline every remote source first, then make sure every image (inlined
-  // logo/photo plus the QR) has finished decoding before the capture starts.
-  const restore = await inlineKtaImages(node);
-  await waitForKtaImages(node);
-  return restore;
-}
-
-function captureOptions(node: HTMLElement) {
-  const width = Math.max(1, node.offsetWidth);
-  const height = Math.max(1, node.offsetHeight);
-  // Equivalent of html2canvas' `scale: 3`: always at least 3x, i.e. a
-  // 1680x1059 PNG for the 560x353 card, so nothing is ever cropped.
-  const pixelRatio = Math.min(4, Math.max(3, Math.ceil(1050 / width)));
-
-  return {
-    backgroundColor: "#0a0b0e",
-    width,
-    height,
-    pixelRatio,
-    // Requested canvas options. html-to-image reads the CORS behaviour from
-    // the <img crossOrigin> attributes (and we pre-inline every image anyway),
-    // while `imagePlaceholder` is its own safety net for a failed image.
-    scale: 3,
-    useCORS: true,
-    allowTaint: true,
-    imageTimeout: 0,
-    imagePlaceholder: DEFAULT_AVATAR_DATA_URL,
-    style: {
-      transform: "none",
-      transformOrigin: "top left",
-      margin: "0",
-      boxSizing: "border-box",
-    },
-  };
-}
-
-async function renderKtaPng(node: HTMLElement): Promise<string> {
-  const restore = await prepareKtaNode(node);
-  try {
-    return await toPng(node, captureOptions(node));
-  } finally {
-    restore();
-  }
-}
-
-function downloadDataUrl(dataUrl: string, fileName: string): void {
+/** Triggers a same-origin browser download for a URL. */
+function triggerUrlDownload(url: string, fileName: string): void {
   const link = document.createElement("a");
+  link.href = url;
   link.download = fileName;
-  link.href = dataUrl;
   link.rel = "noopener";
   document.body.appendChild(link);
   link.click();
   link.remove();
 }
 
-async function dataUrlToPngFile(
-  dataUrl: string,
-  fileName: string,
-): Promise<File> {
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
-  return new File([blob], fileName, { type: "image/png" });
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Gagal membaca gambar KTA."));
+    reader.readAsDataURL(blob);
+  });
 }
 
+/**
+ * Downloads the KTA rendered by the server at `/api/kta/[id]`.
+ *
+ * The PNG is generated with `next/og` and streamed with a
+ * `Content-Disposition: attachment` header, so a plain link navigation saves
+ * it. On mobile we open the image in a new tab instead, which lets the user
+ * save it straight to their gallery with a long-press.
+ *
+ * The PDF simply embeds that same server-rendered PNG into an A4 landscape
+ * page, so the browser never has to rasterise the card itself.
+ */
 export function DownloadButton({
   member,
   format,
-  nodeId = "kta-card-node",
 }: {
   member: Member;
   format: "png" | "pdf";
-  nodeId?: string;
 }) {
   const { pushToast } = useApp();
   const [downloading, setDownloading] = useState(false);
-  const [preview, setPreview] = useState<{
-    url: string;
-    fileName: string;
-  } | null>(null);
   const isPng = format === "png";
   const safeName = sanitizeFileName(member.nama);
   const baseFileName = `KTA-${member.id}-${safeName}`;
+  const apiUrl = `/api/kta/${encodeURIComponent(member.id)}`;
 
   const handleDownload = async () => {
-    const node = document.getElementById(nodeId);
-    if (!node) return;
     setDownloading(true);
     try {
       if (isPng) {
-        const dataUrl = await renderKtaPng(node);
-        const fileName = `${baseFileName}.png`;
-
         if (isMobileBrowser()) {
-          const file = await dataUrlToPngFile(dataUrl, fileName);
-          let shared = false;
-
-          try {
-            if (
-              typeof navigator.share === "function" &&
-              typeof navigator.canShare === "function" &&
-              navigator.canShare({ files: [file] })
-            ) {
-              await navigator.share({
-                files: [file],
-                title: "KTA PUSBAYA",
-                text: `KTA Digital ${member.nama}`,
-              });
-              shared = true;
-            }
-          } catch (shareError) {
-            if (
-              shareError instanceof DOMException &&
-              shareError.name === "AbortError"
-            ) {
-              return;
-            }
-            // Older mobile browsers can reject Web Share; fall back to the
-            // long-press preview modal instead.
-          }
-
-          if (shared) {
-            pushToast(
-              "success",
-              "KTA siap disimpan",
-              "Pilih Simpan ke Galeri pada menu berbagi HP Anda.",
-            );
-            return;
-          }
-
-          setPreview({ url: dataUrl, fileName });
+          window.open(apiUrl, "_blank", "noopener");
           pushToast(
-            "info",
+            "success",
             "KTA siap disimpan",
             "Tekan dan tahan gambar untuk menyimpan ke Galeri HP.",
           );
-          return;
+        } else {
+          triggerUrlDownload(apiUrl, `${baseFileName}.png`);
+          pushToast(
+            "success",
+            "KTA berhasil diunduh",
+            `Kartu ${member.nama} tersimpan sebagai PNG.`,
+          );
         }
-
-        downloadDataUrl(dataUrl, fileName);
-        pushToast(
-          "success",
-          "KTA berhasil diunduh",
-          `Kartu ${member.nama} tersimpan sebagai PNG.`,
-        );
         return;
       }
 
-      const restore = await prepareKtaNode(node);
-      let dataUrl: string;
-      try {
-        dataUrl = await toJpeg(node, {
-          ...captureOptions(node),
-          quality: 0.95,
-        });
-      } finally {
-        restore();
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error("Gagal membuat gambar KTA di server.");
       }
+      const dataUrl = await blobToDataUrl(await response.blob());
       const { jsPDF } = await import("jspdf");
       const pdf = new jsPDF({
         orientation: "landscape",
@@ -815,17 +614,15 @@ export function DownloadButton({
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 12;
-      const nodeWidth = node.offsetWidth;
-      const nodeHeight = node.offsetHeight;
       const ratio = Math.min(
-        (pageWidth - margin * 2) / nodeWidth,
-        (pageHeight - margin * 2) / nodeHeight,
+        (pageWidth - margin * 2) / 1050,
+        (pageHeight - margin * 2) / 630,
       );
-      const width = nodeWidth * ratio;
-      const height = nodeHeight * ratio;
+      const width = 1050 * ratio;
+      const height = 630 * ratio;
       pdf.addImage(
         dataUrl,
-        "JPEG",
+        "PNG",
         (pageWidth - width) / 2,
         (pageHeight - height) / 2,
         width,
@@ -852,66 +649,18 @@ export function DownloadButton({
   };
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={handleDownload}
-        disabled={downloading}
-        className={cn("btn py-2.5", isPng ? "btn-gold" : "btn-outline")}
-      >
-        <Download className={cn("h-4 w-4", downloading && "animate-pulse")} />
-        {downloading
-          ? `Menyiapkan ${isPng ? "PNG" : "PDF"}…`
-          : isPng
-            ? "Download KTA"
-            : "Download PDF"}
-      </button>
-
-      <Modal
-        open={Boolean(preview)}
-        onClose={() => setPreview(null)}
-        title="Simpan KTA ke Galeri HP"
-        description="Gambar KTA sudah dirender dalam resolusi tinggi dan siap disimpan."
-        size="lg"
-        footer={
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => setPreview(null)}
-          >
-            Tutup
-          </button>
-        }
-      >
-        {preview && (
-          <div className="space-y-4 text-center">
-            <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
-              <p className="text-[12px] font-semibold text-amber-200">
-                Tekan dan tahan gambar untuk menyimpan ke Galeri HP
-              </p>
-              <p className="mt-1 text-[10.5px] text-slate-400">
-                Jika long-press tidak tersedia, gunakan tombol unduh di bawah.
-              </p>
-            </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={preview.url}
-              alt={`KTA ${member.nama}`}
-              crossOrigin="anonymous"
-              draggable={false}
-              className="mx-auto w-full max-w-[560px] rounded-xl border border-white/10 shadow-2xl shadow-black/50"
-            />
-            <a
-              href={preview.url}
-              download={preview.fileName}
-              className="btn btn-gold w-full sm:w-auto"
-            >
-              <Download className="h-4 w-4" />
-              Unduh Gambar
-            </a>
-          </div>
-        )}
-      </Modal>
-    </>
+    <button
+      type="button"
+      onClick={handleDownload}
+      disabled={downloading}
+      className={cn("btn py-2.5", isPng ? "btn-gold" : "btn-outline")}
+    >
+      <Download className={cn("h-4 w-4", downloading && "animate-pulse")} />
+      {downloading
+        ? `Menyiapkan ${isPng ? "PNG" : "PDF"}…`
+        : isPng
+          ? "Download KTA"
+          : "Download PDF"}
+    </button>
   );
 }

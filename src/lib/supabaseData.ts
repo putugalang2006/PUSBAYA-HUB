@@ -99,6 +99,18 @@ export async function fetchMembersFromDb(): Promise<Member[]> {
   return ((data ?? []) as DbMemberRow[]).map(normalizeMemberRow);
 }
 
+export async function fetchMemberById(id: string): Promise<Member | null> {
+  assertSupabaseConfigured();
+  const { data, error } = await supabase
+    .from("members")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data ? normalizeMemberRow(data as DbMemberRow) : null;
+}
+
 export async function fetchUserByUsername(
   username: string,
 ): Promise<DbUser | null> {

@@ -4,7 +4,7 @@ import { LOGO_STT_DATA_URL } from "@/lib/logoData";
 /**
  * Official emblem of Sekaa Teruna Putra Settu Bhakti Jaya — Banjar Campuan.
  * The artwork is inlined as a base64 data URL so it renders everywhere,
- * including inside html-to-image exports on mobile Safari/Chrome.
+ * including inside the server-rendered KTA image on mobile Safari/Chrome.
  */
 export function LogoMark({
   size = 40,

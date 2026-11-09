@@ -34,21 +34,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 /**
- * Inline SVG fallback used when a profile photo cannot be fetched (offline,
- * CORS, or a broken Storage URL). Embedded as Base64 so it never triggers a
- * network request and renders identically on every browser.
- */
-export const DEFAULT_AVATAR_DATA_URL =
-  "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMTI4IDEyOCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJhIiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjM2EyZjEyIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTQxMTBhIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIGZpbGw9InVybCgjYSkiLz48Y2lyY2xlIGN4PSI2NCIgY3k9IjQ3IiByPSIyMyIgZmlsbD0iI2Y1ZDM2OCIvPjxwYXRoIGQ9Ik0yMCAxMjJjMC0yNCAyMC0zNyA0NC0zN3M0NCAxMyA0NCAzN3oiIGZpbGw9IiNmNWQzNjgiLz48L3N2Zz4=";
-
-/**
- * Fetches any image URL (the public STT logo or a Supabase Storage profile
- * photo) and converts it into an inline Base64 data URL.
- *
- * Mobile WebKit/Chrome frequently drop remote `<img>` sources while a canvas
- * rasterises the KTA. Turning the source into a `data:` URL first removes the
- * network step from the render entirely, so the logo and photo are always
- * baked into the exported PNG/PDF.
+ * Fetches any image URL and converts it into an inline Base64 data URL.
  *
  * Throws when the URL cannot be fetched so the caller can apply a fallback.
  */
