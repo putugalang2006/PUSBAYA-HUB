@@ -33,6 +33,60 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+/**
+ * Inline SVG fallback used when a profile photo cannot be fetched (offline,
+ * CORS, or a broken Storage URL). Embedded as Base64 so it never triggers a
+ * network request and renders identically on every browser.
+ */
+export const DEFAULT_AVATAR_DATA_URL =
+  "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMTI4IDEyOCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJhIiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjM2EyZjEyIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTQxMTBhIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIGZpbGw9InVybCgjYSkiLz48Y2lyY2xlIGN4PSI2NCIgY3k9IjQ3IiByPSIyMyIgZmlsbD0iI2Y1ZDM2OCIvPjxwYXRoIGQ9Ik0yMCAxMjJjMC0yNCAyMC0zNyA0NC0zN3M0NCAxMyA0NCAzN3oiIGZpbGw9IiNmNWQzNjgiLz48L3N2Zz4=";
+
+/**
+ * Fetches any image URL (the public STT logo or a Supabase Storage profile
+ * photo) and converts it into an inline Base64 data URL.
+ *
+ * Mobile WebKit/Chrome frequently drop remote `<img>` sources while a canvas
+ * rasterises the KTA. Turning the source into a `data:` URL first removes the
+ * network step from the render entirely, so the logo and photo are always
+ * baked into the exported PNG/PDF.
+ *
+ * Throws when the URL cannot be fetched so the caller can apply a fallback.
+ */
+export async function urlToBase64(
+  url: string,
+  options: { timeoutMs?: number } = {},
+): Promise<string> {
+  if (!url) throw new Error("URL gambar kosong.");
+  if (url.startsWith("data:")) return url;
+
+  const timeoutMs = options.timeoutMs ?? 15000;
+  const controller = new AbortController();
+  const timer =
+    timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+  try {
+    const response = await fetch(url, {
+      mode: "cors",
+      credentials: "omit",
+      cache: "force-cache",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Gagal memuat gambar (HTTP ${response.status}).`);
+    }
+    const blob = await response.blob();
+    if (!blob.size) throw new Error("Berkas gambar kosong.");
+    return await blobToDataUrl(blob);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Waktu memuat gambar habis.");
+    }
+    throw error instanceof Error ? error : new Error("Gagal memuat gambar.");
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();

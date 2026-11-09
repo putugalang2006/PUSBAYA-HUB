@@ -26,6 +26,7 @@ import {
 import { LogoMark } from "@/components/ui/Logo";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
+import { DEFAULT_AVATAR_DATA_URL, urlToBase64 } from "@/lib/image";
 
 export function KtaView({
   onNavigate,
@@ -414,6 +415,7 @@ export function KtaCard({
                     src={photo}
                     alt={`Foto ${member.nama}`}
                     crossOrigin="anonymous"
+                    data-kta-role="photo"
                     className="h-full w-full object-cover"
                   />
                 ) : (
@@ -558,53 +560,81 @@ async function waitForKtaImages(node: HTMLElement): Promise<void> {
   );
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Gagal membaca data gambar."));
-    reader.readAsDataURL(blob);
-  });
-}
+type KtaImageBackup = {
+  image: HTMLImageElement;
+  src: string;
+  crossOrigin: string | null;
+};
 
 /**
- * Converts every non-data-URL image inside the card into an inline data URL
- * before the export runs. This makes the download independent from the
- * network and from `html-to-image`'s image fetcher, which is the part that
- * could drop the STT logo (the only image served over HTTP) on some browsers.
+ * Converts every remote image inside the card (the STT logo when served over
+ * HTTP, and the Supabase Storage profile photo) into an inline Base64 data URL
+ * before the export runs:
+ *
+ *   1. `urlToBase64()` fetches the source and encodes it as `data:image/...`.
+ *   2. The Base64 string is written straight into the `<img src="...">`.
+ *   3. `waitForKtaImages()` then awaits `decode()` so the pixels are ready.
+ *
+ * If a profile photo cannot be fetched (offline/CORS/broken URL) a local
+ * Base64 avatar is substituted, so the card is never exported with an empty
+ * photo slot. The original attributes are restored afterwards, so the
+ * on-screen card is left exactly as it was.
+ *
+ * Returns a `restore()` callback that puts every original `src` back.
  */
-async function inlineKtaImages(node: HTMLElement): Promise<void> {
+async function inlineKtaImages(node: HTMLElement): Promise<() => void> {
   const images = Array.from(node.querySelectorAll("img"));
+  const backups: KtaImageBackup[] = [];
+
   await Promise.all(
     images.map(async (image) => {
-      const src = image.currentSrc || image.src;
-      if (!src || src.startsWith("data:")) return;
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), KTA_IMAGE_TIMEOUT_MS);
+      const originalSrc = image.getAttribute("src") ?? "";
+      const source = image.currentSrc || image.src;
+      if (!source || source.startsWith("data:")) return;
+
+      backups.push({
+        image,
+        src: originalSrc,
+        crossOrigin: image.getAttribute("crossorigin"),
+      });
+
+      let dataUrl: string | null = null;
       try {
-        const response = await fetch(src, {
-          cache: "force-cache",
-          signal: controller.signal,
-        });
-        if (!response.ok) return;
-        const blob = await response.blob();
-        if (!blob.size) return;
-        const dataUrl = await blobToDataUrl(blob);
-        image.src = dataUrl;
+        dataUrl = await urlToBase64(source, { timeoutMs: KTA_IMAGE_TIMEOUT_MS });
       } catch {
-        // Keep the original src; html-to-image will still try to embed it.
-      } finally {
-        clearTimeout(timer);
+        dataUrl = null;
       }
+
+      // A missing profile photo falls back to the local avatar; any other
+      // image simply keeps its original source.
+      if (!dataUrl && image.dataset.ktaRole === "photo") {
+        dataUrl = DEFAULT_AVATAR_DATA_URL;
+      }
+      if (!dataUrl) return;
+
+      image.removeAttribute("crossorigin");
+      image.src = dataUrl;
     }),
   );
+
+  return () => {
+    for (const backup of backups) {
+      if (backup.crossOrigin !== null) {
+        backup.image.setAttribute("crossorigin", backup.crossOrigin);
+      } else {
+        backup.image.removeAttribute("crossorigin");
+      }
+      backup.image.setAttribute("src", backup.src);
+    }
+  };
 }
 
-async function prepareKtaNode(node: HTMLElement): Promise<void> {
+async function prepareKtaNode(node: HTMLElement): Promise<() => void> {
   // Inline every remote source first, then make sure every image (inlined
   // logo/photo plus the QR) has finished decoding before the capture starts.
-  await inlineKtaImages(node);
+  const restore = await inlineKtaImages(node);
   await waitForKtaImages(node);
+  return restore;
 }
 
 function captureOptions(node: HTMLElement) {
@@ -619,13 +649,14 @@ function captureOptions(node: HTMLElement) {
     width,
     height,
     pixelRatio,
-    // Requested cross-origin/canvas options. html-to-image reads the CORS
-    // behaviour from the <img crossOrigin> attributes (and we pre-inline the
-    // images anyway), while the timeout mirrors `imageTimeout`.
+    // Requested canvas options. html-to-image reads the CORS behaviour from
+    // the <img crossOrigin> attributes (and we pre-inline every image anyway),
+    // while `imagePlaceholder` is its own safety net for a failed image.
     scale: 3,
     useCORS: true,
     allowTaint: true,
-    imageTimeout: KTA_IMAGE_TIMEOUT_MS,
+    imageTimeout: 0,
+    imagePlaceholder: DEFAULT_AVATAR_DATA_URL,
     style: {
       transform: "none",
       transformOrigin: "top left",
@@ -636,8 +667,12 @@ function captureOptions(node: HTMLElement) {
 }
 
 async function renderKtaPng(node: HTMLElement): Promise<string> {
-  await prepareKtaNode(node);
-  return toPng(node, captureOptions(node));
+  const restore = await prepareKtaNode(node);
+  try {
+    return await toPng(node, captureOptions(node));
+  } finally {
+    restore();
+  }
 }
 
 function downloadDataUrl(dataUrl: string, fileName: string): void {
@@ -742,11 +777,16 @@ export function DownloadButton({
         return;
       }
 
-      await prepareKtaNode(node);
-      const dataUrl = await toJpeg(node, {
-        ...captureOptions(node),
-        quality: 0.95,
-      });
+      const restore = await prepareKtaNode(node);
+      let dataUrl: string;
+      try {
+        dataUrl = await toJpeg(node, {
+          ...captureOptions(node),
+          quality: 0.95,
+        });
+      } finally {
+        restore();
+      }
       const { jsPDF } = await import("jspdf");
       const pdf = new jsPDF({
         orientation: "landscape",
