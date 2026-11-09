@@ -27,6 +27,7 @@ import { LogoMark } from "@/components/ui/Logo";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
 import { DEFAULT_AVATAR_DATA_URL, urlToBase64 } from "@/lib/image";
+import { LOGO_STT_DATA_URL } from "@/lib/logoData";
 
 export function KtaView({
   onNavigate,
@@ -383,9 +384,27 @@ export function KtaCard({
         />
 
         <div className="relative flex h-full flex-col justify-between">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <LogoMark size={40} glow={false} />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center">
+              {/*
+                Header logo. Inlined as a Base64 data URL (never a network
+                request), with no responsive hiding classes so it is always
+                visible on desktop and mobile, and always captured on export.
+              */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={LOGO_STT_DATA_URL}
+                alt="Logo ST Putra Settu Bhakti Jaya"
+                crossOrigin="anonymous"
+                data-kta-role="logo"
+                draggable={false}
+                style={{
+                  height: 32,
+                  width: "auto",
+                  objectFit: "contain",
+                  marginRight: 8,
+                }}
+              />
               <div>
                 <p className="text-[13px] font-extrabold uppercase leading-none tracking-[0.12em]">
                   <span className="gold-text">Pusbaya Hub</span>
