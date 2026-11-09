@@ -3,8 +3,11 @@ export type Role = "PENGGUNA" | "ADMIN";
 export type Tempekan =
   | "Tempek Kauh Kelod"
   | "Tempek Kauh Kaja"
-  | "Tempek Dangin Daja"
-  | "Tempek Dangin Kelod";
+  | "Tempek Kangin Kaja"
+  | "Tempek Kangin Kelod";
+
+/** Editable person in charge (penggerak) shown beneath each tempekan. */
+export type TempekanPenggerak = Record<Tempekan, string>;
 
 export type MemberStatus = "Ketua" | "Pengurus" | "Anggota";
 export type AgeGroup = "Pelajar" | "Remaja" | "Dewasa";

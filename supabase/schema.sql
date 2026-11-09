@@ -120,3 +120,43 @@ create policy "pusbaya_profile_pictures_update" on storage.objects
 drop policy if exists "pusbaya_profile_pictures_delete" on storage.objects;
 create policy "pusbaya_profile_pictures_delete" on storage.objects
   for delete using (bucket_id = 'profile-pictures');
+
+-- =============================================================
+-- Pengaturan aplikasi bersama (mis. nama penggerak tiap tempekan)
+-- =============================================================
+create table if not exists public.settings (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.settings enable row level security;
+
+drop policy if exists "pusbaya_settings_select" on public.settings;
+create policy "pusbaya_settings_select" on public.settings
+  for select using (true);
+
+drop policy if exists "pusbaya_settings_insert" on public.settings;
+create policy "pusbaya_settings_insert" on public.settings
+  for insert with check (true);
+
+drop policy if exists "pusbaya_settings_update" on public.settings;
+create policy "pusbaya_settings_update" on public.settings
+  for update using (true) with check (true);
+
+drop policy if exists "pusbaya_settings_delete" on public.settings;
+create policy "pusbaya_settings_delete" on public.settings
+  for delete using (true);
+
+grant select, insert, update, delete on public.settings to anon, authenticated;
+
+-- Migrasi nama tempekan lama ("Dangin Daja"/"Dangin Kelod") ke nama baru
+-- ("Kangin Kaja"/"Kangin Kelod"). Aplikasi juga memetakan nilai lama secara
+-- otomatis, jadi baris yang belum termigrasi tetap tampil benar.
+update public.members
+  set tempekan = 'Tempek Kangin Kaja'
+  where tempekan = 'Tempek Dangin Daja';
+
+update public.members
+  set tempekan = 'Tempek Kangin Kelod'
+  where tempekan = 'Tempek Dangin Kelod';

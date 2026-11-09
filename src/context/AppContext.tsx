@@ -9,7 +9,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { ADMIN_USERNAME, STORAGE_KEYS, TEMPEKAN_LIST } from "@/lib/constants";
+import {
+  ADMIN_USERNAME,
+  STORAGE_KEYS,
+  TEMPEKAN_LIST,
+  TEMPEKAN_PENGGERAK_DEFAULTS,
+} from "@/lib/constants";
 import {
   findMemberForAuth,
   memberCode,
@@ -24,6 +29,8 @@ import type {
   Member,
   MemberInput,
   Role,
+  Tempekan,
+  TempekanPenggerak,
   ToastMessage,
   UserAccount,
 } from "@/lib/types";
@@ -31,9 +38,11 @@ import { isSupabaseConfigured, SUPABASE_CONFIG_ERROR } from "@/lib/supabase";
 import {
   deleteMemberRecord,
   fetchMembersFromDb,
+  fetchTempekanPenggerak,
   fetchUserByUsername,
   insertMember,
   insertUser,
+  saveTempekanPenggerak,
   updateMemberProfile,
   updateMemberRecord,
   updateUserProfile,
@@ -79,6 +88,12 @@ interface AppContextValue {
   deleteMember: (id: string) => Promise<boolean>;
   registeredMember: Member | undefined;
   isRegistered: boolean;
+
+  tempekanPenggerak: TempekanPenggerak;
+  updateTempekanPenggerak: (
+    tempekan: Tempekan,
+    nama: string,
+  ) => Promise<boolean>;
 
   sessions: AttendanceSession[];
   createSession: (input: {
@@ -129,6 +144,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions, sessionsHydrated] = useLocalStorageState<
     AttendanceSession[]
   >(STORAGE_KEYS.sessions, []);
+  const [tempekanPenggerak, setTempekanPenggerak, tempekanHydrated] =
+    useLocalStorageState<TempekanPenggerak>(
+      STORAGE_KEYS.tempekanPenggerak,
+      TEMPEKAN_PENGGERAK_DEFAULTS,
+    );
 
   const [bootstrapped, setBootstrapped] = useState(false);
   const [online, setOnline] = useState(true);
@@ -139,7 +159,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const registrationLock = useRef(false);
   const authRef = useRef(auth);
 
-  const hydrated = authHydrated && sessionsHydrated && bootstrapped;
+  const hydrated =
+    authHydrated && sessionsHydrated && tempekanHydrated && bootstrapped;
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
@@ -179,6 +200,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return data;
   }, []);
 
+  // Loads the editable tempekan penggerak map from the optional `settings`
+  // table. Any failure keeps the cached/default values, so the app never
+  // breaks when the table has not been created yet.
+  const loadPenggerak = useCallback(async (): Promise<void> => {
+    try {
+      const remote = await fetchTempekanPenggerak();
+      if (remote) setTempekanPenggerak(remote);
+    } catch {
+      // Settings table unavailable — keep local/default values.
+    }
+  }, [setTempekanPenggerak]);
+
   useEffect(() => {
     authRef.current = auth;
   }, [auth]);
@@ -215,6 +248,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         setMembers(dbMembers);
         setLastSyncedAt(syncedTime());
+        await loadPenggerak();
+        if (cancelled) return;
 
         const currentAuth = authRef.current;
         if (currentAuth?.username) {
@@ -247,7 +282,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [authHydrated, pushToast, setAuth]);
+  }, [authHydrated, loadPenggerak, pushToast, setAuth]);
 
   // Keep attendance sessions in sync between tabs while auth and members
   // always come from Supabase.
@@ -687,6 +722,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRefreshing(true);
     try {
       await loadMembers();
+      await loadPenggerak();
       pushToast(
         "success",
         "Data disegarkan",
@@ -697,7 +733,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setRefreshing(false);
     }
-  }, [loadMembers, pushToast, reportSupabaseError]);
+  }, [loadMembers, loadPenggerak, pushToast, reportSupabaseError]);
+
+  const updateTempekanPenggerak = useCallback(
+    async (tempekan: Tempekan, nama: string): Promise<boolean> => {
+      const cleaned = nama.trim();
+      const next: TempekanPenggerak = {
+        ...tempekanPenggerak,
+        [tempekan]: cleaned,
+      };
+      // Optimistically update the UI and the local cache first.
+      setTempekanPenggerak(next);
+      try {
+        await saveTempekanPenggerak(next);
+        pushToast(
+          "success",
+          "Nama penggerak disimpan",
+          `${tempekan} · ${cleaned || "—"}`,
+        );
+        return true;
+      } catch {
+        pushToast(
+          "error",
+          "Gagal menyimpan ke server",
+          "Perubahan tetap tersimpan di perangkat ini.",
+        );
+        return false;
+      }
+    },
+    [pushToast, setTempekanPenggerak, tempekanPenggerak],
+  );
 
   const registeredMember = useMemo(
     () => findMemberForAuth(members, auth),
@@ -719,6 +784,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteMember,
       registeredMember,
       isRegistered,
+      tempekanPenggerak,
+      updateTempekanPenggerak,
       sessions,
       createSession,
       deleteSession,
@@ -744,6 +811,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteMember,
       registeredMember,
       isRegistered,
+      tempekanPenggerak,
+      updateTempekanPenggerak,
       sessions,
       createSession,
       deleteSession,

@@ -1,7 +1,8 @@
 import {
   AGE_GROUP_LIST,
   MEMBER_STATUS_LIST,
-  TEMPEKAN_LIST,
+  normalizePenggerak,
+  normalizeTempekan,
 } from "@/lib/constants";
 import type {
   AgeGroup,
@@ -9,7 +10,7 @@ import type {
   MemberInput,
   MemberStatus,
   Role,
-  Tempekan,
+  TempekanPenggerak,
   UserAccount,
 } from "@/lib/types";
 import { assertSupabaseConfigured, supabase } from "@/lib/supabase";
@@ -48,9 +49,7 @@ export type DbUser = {
 };
 
 function normalizeMemberRow(row: DbMemberRow): Member {
-  const tempekan = TEMPEKAN_LIST.includes(row.tempekan as Tempekan)
-    ? (row.tempekan as Tempekan)
-    : TEMPEKAN_LIST[0];
+  const tempekan = normalizeTempekan(row.tempekan);
   const status = MEMBER_STATUS_LIST.includes(row.status as MemberStatus)
     ? (row.status as MemberStatus)
     : "Anggota";
@@ -391,5 +390,43 @@ export async function updateMemberRecord(
 export async function deleteMemberRecord(id: string): Promise<void> {
   assertSupabaseConfigured();
   const { error } = await supabase.from("members").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * App-wide key/value settings live in the optional `settings` table. When the
+ * table is missing, reads/writes throw and the caller falls back to local
+ * state, so the feature never blocks the rest of the app.
+ */
+const SETTINGS_TABLE = "settings";
+export const TEMPEKAN_PENGGERAK_KEY = "tempekan_penggerak";
+
+export async function fetchTempekanPenggerak(): Promise<TempekanPenggerak | null> {
+  assertSupabaseConfigured();
+  const { data, error } = await supabase
+    .from(SETTINGS_TABLE)
+    .select("value")
+    .eq("key", TEMPEKAN_PENGGERAK_KEY)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return normalizePenggerak(
+    (data as { value?: Partial<Record<string, string>> | null }).value,
+  );
+}
+
+export async function saveTempekanPenggerak(
+  value: TempekanPenggerak,
+): Promise<void> {
+  assertSupabaseConfigured();
+  const { error } = await supabase.from(SETTINGS_TABLE).upsert(
+    {
+      key: TEMPEKAN_PENGGERAK_KEY,
+      value,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "key" },
+  );
   if (error) throw new Error(error.message);
 }

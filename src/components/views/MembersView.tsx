@@ -41,6 +41,7 @@ export function MembersView({
     updateMember,
     deleteMember,
     pushToast,
+    tempekanPenggerak,
   } = useApp();
   const isAdmin = auth?.role === "ADMIN";
 
@@ -180,7 +181,9 @@ export function MembersView({
               <option value="ALL">Semua Tempekan</option>
               {TEMPEKAN_LIST.map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {tempekanPenggerak[item]
+                    ? `${item} · ${tempekanPenggerak[item]}`
+                    : item}
                 </option>
               ))}
             </select>

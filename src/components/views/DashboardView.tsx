@@ -21,6 +21,7 @@ import { useApp } from "@/context/AppContext";
 import { ST_NAME, TEMPEKAN_LIST } from "@/lib/constants";
 import { cn, formatDateShort, formatNumber, percent } from "@/lib/utils";
 import { MemberForm } from "@/components/members/MemberForm";
+import { TempekanPenggerakEditor } from "@/components/members/TempekanPenggerakEditor";
 import { LogoMark } from "@/components/ui/Logo";
 import { EditProfileButton } from "@/components/profile/EditProfileButton";
 import type { Member, PageKey } from "@/lib/types";
@@ -37,6 +38,7 @@ export function DashboardView({
     pushToast,
     registeredMember,
     isRegistered,
+    tempekanPenggerak,
   } = useApp();
   const isAdmin = auth?.role === "ADMIN";
 
@@ -357,13 +359,18 @@ export function DashboardView({
                   className="group rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5 transition-colors hover:border-amber-400/20 hover:bg-amber-400/[0.03]"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-amber-400/15 bg-amber-400/[0.07] text-amber-400/90">
+                    <div className="flex items-start gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-amber-400/15 bg-amber-400/[0.07] text-amber-400/90">
                         <Building2 className="h-3.5 w-3.5" />
                       </span>
-                      <p className="text-[11.5px] font-semibold leading-tight text-slate-300">
-                        {item.tempekan}
-                      </p>
+                      <div className="min-w-0">
+                        <p className="text-[11.5px] font-semibold leading-tight text-slate-300">
+                          {item.tempekan}
+                        </p>
+                        <p className="mt-0.5 truncate text-[10px] font-medium text-amber-300/70">
+                          {tempekanPenggerak[item.tempekan] || "Belum ditentukan"}
+                        </p>
+                      </div>
                     </div>
                     <span className="font-mono text-[11px] font-bold text-amber-300">
                       {pct}%
@@ -415,6 +422,9 @@ export function DashboardView({
       </div>
         </>
       )}
+
+      {/* Editable person in charge per tempekan (admin only) */}
+      {isAdmin && <TempekanPenggerakEditor />}
     </div>
   );
 }
