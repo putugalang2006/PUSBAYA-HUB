@@ -518,7 +518,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         pushToast(
           "success",
           "Profil berhasil diperbarui!",
-          "Perubahan username dan foto tersimpan ke Supabase.",
+          "Perubahan username dan foto berhasil disimpan.",
         );
         return { ok: true };
       } catch (error) {

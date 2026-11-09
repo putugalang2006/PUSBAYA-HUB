@@ -461,7 +461,7 @@ export function LoginScreen({
                     {submitting ? (
                       <>
                         <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
-                        {isRegister ? "Menyimpan ke Supabase…" : "Memverifikasi…"}
+                        {isRegister ? "Mendaftarkan…" : "Memverifikasi…"}
                       </>
                     ) : role === "ADMIN" ? (
                       <>
@@ -517,7 +517,7 @@ export function LoginScreen({
                 <div className="mt-4 flex items-center justify-center gap-2">
                   <Wifi className="h-3.5 w-3.5 text-emerald-400" />
                   <p className="text-[10.5px] text-slate-500">
-                    Akun & data tersimpan aman di Supabase
+                    Akun & data tersimpan dengan aman
                   </p>
                 </div>
               </div>
