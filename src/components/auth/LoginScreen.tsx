@@ -170,33 +170,32 @@ export function LoginScreen({
         ? "Buat akun pengguna untuk mengakses dashboard PUSBAYA HUB."
         : "Masuk dengan username dan password akun Anda.";
 
+  const inputBase =
+    "w-full rounded-xl border border-zinc-700/60 bg-zinc-800/50 py-3 pl-11 text-sm text-white outline-none transition-all duration-200 placeholder:text-zinc-500 hover:border-zinc-600 focus:border-amber-500 focus:bg-zinc-800/70 focus:ring-2 focus:ring-amber-500/20";
+
   return (
-    <main className="relative flex min-h-screen flex-col overflow-hidden">
+    <main className="relative flex min-h-screen flex-col overflow-hidden bg-zinc-950">
       <div className="app-backdrop" />
 
+      {/* Ambient lighting */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-[58%] top-[44%] h-[120vmin] w-[120vmin] -translate-x-1/2 -translate-y-1/2 sm:h-[130vmin] sm:w-[130vmin]">
+        <div className="absolute left-1/2 top-[-14%] h-[62vmin] w-[62vmin] -translate-x-1/2 rounded-full bg-amber-500/10 blur-[120px]" />
+        <div className="absolute -left-[12%] top-1/3 h-[46vmin] w-[46vmin] rounded-full bg-amber-500/10 blur-[120px]" />
+        <div className="absolute -right-[10%] bottom-[-12%] h-[56vmin] w-[56vmin] rounded-full bg-yellow-600/10 blur-[120px]" />
+
+        <div className="absolute left-[30%] top-1/2 h-[120vmin] w-[120vmin] -translate-x-1/2 -translate-y-1/2 sm:left-[58%] sm:h-[130vmin] sm:w-[130vmin]">
           <div
-            className="bg-aurora absolute inset-0 rounded-full blur-[80px] sm:blur-[100px]"
+            className="bg-aurora absolute inset-0 rounded-full blur-[100px]"
             style={{
               background:
-                "conic-gradient(from 210deg, transparent 0deg, rgba(250,204,21,0.32) 54deg, transparent 142deg, transparent 212deg, rgba(255,255,255,0.11) 272deg, transparent 350deg)",
+                "conic-gradient(from 210deg, transparent 0deg, rgba(250,204,21,0.30) 54deg, transparent 142deg, transparent 212deg, rgba(255,255,255,0.10) 272deg, transparent 350deg)",
             }}
           />
         </div>
 
-        <div className="landing-float-a absolute -left-36 top-10 h-[460px] w-[460px] rounded-full bg-amber-500/[0.055] blur-[100px]" />
-        <div className="landing-float-b absolute -right-40 bottom-0 h-[520px] w-[520px] rounded-full bg-yellow-600/[0.045] blur-[110px]" />
+        <div className="landing-float-a absolute -left-36 top-10 h-[460px] w-[460px] rounded-full bg-amber-500/[0.05] blur-[110px]" />
+        <div className="landing-float-b absolute -right-40 bottom-0 h-[520px] w-[520px] rounded-full bg-yellow-600/[0.045] blur-[120px]" />
 
-        <div className="absolute left-[4%] top-1/2 hidden w-[min(58vw,620px)] -translate-y-1/2 lg:block">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={LOGO_STT_DATA_URL}
-            alt=""
-            aria-hidden="true"
-            className="login-watermark w-full max-w-none blur-[42px] saturate-150"
-          />
-        </div>
         <div className="login-orbit absolute left-[10%] top-1/2 hidden h-[560px] w-[560px] rounded-full border border-white/[0.035] border-t-amber-400/20 lg:block" />
         <div className="login-orbit-reverse absolute left-[16%] top-1/2 hidden h-[400px] w-[400px] rounded-full border border-white/[0.03] border-b-amber-400/15 lg:block" />
 
@@ -217,80 +216,118 @@ export function LoginScreen({
           />
         ))}
 
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_28%,rgba(7,8,11,0.52)_100%)]" />
+        <div
+          className="absolute inset-0 opacity-[0.025]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, #facc15 1px, transparent 0)",
+            backgroundSize: "26px 26px",
+          }}
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_26%,rgba(9,9,11,0.72)_100%)]" />
       </div>
 
       <div className="relative z-20 mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-5 pt-4 sm:px-8">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 text-[11px] font-semibold text-slate-400 transition hover:border-amber-400/30 hover:bg-amber-400/[0.06] hover:text-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40"
+          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 text-[11px] font-semibold text-zinc-400 transition hover:border-amber-400/30 hover:bg-amber-400/[0.06] hover:text-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Beranda
         </button>
       </div>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-5 pb-6 pt-4 sm:px-8 lg:justify-center lg:py-8">
-        <div className="grid flex-1 items-center gap-12 lg:grid-cols-[1.08fr_0.92fr] lg:gap-16">
+      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-5 pb-6 pt-4 sm:px-8 lg:justify-center lg:py-10">
+        <div className="grid flex-1 items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
           {/* Branding column */}
           <section className="animate-fade-up hidden flex-col lg:flex">
-            <LogoLockup size={48} />
+            <div className="relative w-fit">
+              <div className="pointer-events-none absolute -left-12 -top-12 h-44 w-44 rounded-full bg-amber-500/10 blur-[100px]" />
+              <LogoLockup size={52} />
+            </div>
 
             <div className="mt-12 max-w-xl">
-              <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+              <p className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-amber-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
                 Banjar Campuan · Desa Adat Kerobokan
               </p>
-              <h1 className="text-balance text-[44px] font-extrabold leading-[1.08] tracking-[-0.03em] text-white">
-                Satu data untuk{" "}
-                <span className="gold-text">generasi PUSBAYA</span> yang
-                terhubung.
+              <h1 className="mt-6 text-balance text-[44px] font-extrabold leading-[1.08] tracking-[-0.03em] text-white xl:text-[48px]">
+                Satu data untuk generasi{" "}
+                <span className="bg-gradient-to-r from-amber-300 to-yellow-500 bg-clip-text text-transparent">
+                  PUSBAYA
+                </span>{" "}
+                yang terhubung.
               </h1>
-              <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-slate-400">
+              <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-zinc-400">
                 Pusat pendataan terpadu anggota ST Putra Settu Bhakti Jaya.
                 Buat akun, kelola anggota, absensi sangkep, hingga kartu tanda
                 anggota digital dalam satu dashboard.
               </p>
+
+              <div className="mt-8 flex flex-wrap gap-2.5">
+                {["Pendataan Anggota", "Absensi Sangkep", "KTA Digital"].map(
+                  (item) => (
+                    <span
+                      key={item}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-zinc-300 backdrop-blur-sm"
+                    >
+                      <span className="h-1 w-1 rounded-full bg-amber-400/80" />
+                      {item}
+                    </span>
+                  ),
+                )}
+              </div>
             </div>
           </section>
 
           {/* Auth column */}
-          <section className="animate-fade-up mx-auto w-full max-w-[430px] [animation-delay:120ms]">
+          <section className="animate-fade-up mx-auto w-full max-w-[440px] [animation-delay:120ms]">
             <div className="mb-7 flex flex-col items-center text-center lg:hidden">
               <LogoLockup size={44} />
-              <p className="mt-4 max-w-xs text-[10px] font-semibold uppercase leading-relaxed tracking-[0.16em] text-slate-500">
+              <p className="mt-4 max-w-xs text-[10px] font-semibold uppercase leading-relaxed tracking-[0.16em] text-zinc-500">
                 {APP_SUBTITLE}
               </p>
             </div>
 
-            <div className="panel overflow-hidden">
-              <div className="gold-line h-px w-full" />
-              <div className="p-4 sm:p-8">
+            <div className="relative">
+              {/* Soft glow behind the glass card */}
+              <div className="pointer-events-none absolute -inset-5 rounded-[2rem] bg-amber-500/10 blur-[120px]" />
+
+              <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-zinc-900/60 p-6 shadow-2xl shadow-amber-500/10 backdrop-blur-xl sm:p-8">
+                <div className="gold-line absolute inset-x-0 top-0 h-px" />
+
                 <div className="mb-5">
                   <h2 className="text-xl font-extrabold tracking-tight text-white">
                     {cardTitle}
                   </h2>
-                  <p className="mt-1.5 text-[13px] leading-relaxed text-slate-400">
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-400">
                     {cardDescription}
                   </p>
                 </div>
 
                 <div
-                  className="mb-6 grid grid-cols-2 gap-1 rounded-xl border border-white/[0.07] bg-black/30 p-1"
+                  className="relative mb-6 flex rounded-full border border-amber-500/15 bg-black/40 p-1"
                   role="tablist"
                   aria-label="Pilih role login"
                 >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "pointer-events-none absolute bottom-1 left-1 top-1 w-[calc(50%_-_0.25rem)] rounded-full bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-600 shadow-lg shadow-amber-500/30 transition-transform duration-300 ease-out",
+                      role === "ADMIN" && "translate-x-full",
+                    )}
+                  />
                   <button
                     type="button"
                     role="tab"
                     aria-selected={role === "PENGGUNA"}
                     onClick={() => switchRole("PENGGUNA")}
                     className={cn(
-                      "flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200",
+                      "relative z-10 flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors duration-300",
                       role === "PENGGUNA"
-                        ? "bg-gradient-to-b from-amber-300 to-yellow-500 text-slate-950 shadow-lg shadow-amber-500/20"
-                        : "text-slate-400 hover:bg-white/[0.04] hover:text-white",
+                        ? "text-zinc-950"
+                        : "text-zinc-400 hover:text-white",
                     )}
                   >
                     <UserRound className="h-3.5 w-3.5" />
@@ -302,10 +339,10 @@ export function LoginScreen({
                     aria-selected={role === "ADMIN"}
                     onClick={() => switchRole("ADMIN")}
                     className={cn(
-                      "flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200",
+                      "relative z-10 flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors duration-300",
                       role === "ADMIN"
-                        ? "bg-gradient-to-b from-amber-300 to-yellow-500 text-slate-950 shadow-lg shadow-amber-500/20"
-                        : "text-slate-400 hover:bg-white/[0.04] hover:text-white",
+                        ? "text-zinc-950"
+                        : "text-zinc-400 hover:text-white",
                     )}
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
@@ -319,7 +356,7 @@ export function LoginScreen({
                       {role === "ADMIN" ? "Username Admin" : "Username"}
                     </label>
                     <div className="relative">
-                      <UserRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      <UserRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-500/70" />
                       <input
                         id="login-username"
                         type="text"
@@ -330,7 +367,7 @@ export function LoginScreen({
                             ? "Masukkan username admin"
                             : "Pilih username Anda"
                         }
-                        className="field pl-10"
+                        className={cn(inputBase, "pr-4")}
                         autoComplete="username"
                         autoCapitalize="none"
                         spellCheck={false}
@@ -345,7 +382,7 @@ export function LoginScreen({
                       Password
                     </label>
                     <div className="relative">
-                      <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-500/70" />
                       <input
                         id="login-password"
                         type={showPassword ? "text" : "password"}
@@ -356,7 +393,7 @@ export function LoginScreen({
                             ? "Minimal 6 karakter"
                             : "Masukkan password"
                         }
-                        className="field pl-10 pr-11"
+                        className={cn(inputBase, "pr-11")}
                         autoComplete={
                           isRegister ? "new-password" : "current-password"
                         }
@@ -364,7 +401,7 @@ export function LoginScreen({
                       <button
                         type="button"
                         onClick={() => setShowPassword((prev) => !prev)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-500 transition hover:bg-white/5 hover:text-slate-300"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-amber-500/60 transition hover:bg-white/5 hover:text-amber-300"
                         aria-label={
                           showPassword
                             ? "Sembunyikan password"
@@ -379,7 +416,7 @@ export function LoginScreen({
                       </button>
                     </div>
                     {isRegister && (
-                      <p className="mt-1.5 text-[10px] text-slate-500">
+                      <p className="mt-1.5 text-[10px] text-zinc-500">
                         Password wajib terdiri dari minimal 6 karakter.
                       </p>
                     )}
@@ -388,7 +425,7 @@ export function LoginScreen({
                   {isRegister && (
                     <div className="animate-fade-in">
                       <span className="label">Foto Profil (Opsional)</span>
-                      <div className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
+                      <div className="flex items-center gap-3 rounded-xl border border-zinc-700/50 bg-zinc-800/40 p-3">
                         <UserAvatar
                           name={username || "Pengguna"}
                           photo={photo || undefined}
@@ -424,7 +461,7 @@ export function LoginScreen({
                               </button>
                             )}
                           </div>
-                          <p className="mt-1.5 text-[9.5px] leading-relaxed text-slate-500">
+                          <p className="mt-1.5 text-[9.5px] leading-relaxed text-zinc-500">
                             JPG/PNG/WEBP · otomatis dikompres (maks 800px, WebP)
                             sebelum diunggah. Tanpa foto, avatar memakai inisial
                             username.
@@ -456,11 +493,11 @@ export function LoginScreen({
                     type="submit"
                     disabled={submitting || photoBusy}
                     aria-busy={submitting}
-                    className="btn btn-gold group mt-1 w-full py-3 text-[13px] disabled:cursor-wait disabled:opacity-75"
+                    className="group mt-1 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-600 py-3.5 text-[13px] font-bold text-zinc-950 shadow-lg shadow-amber-500/20 transition-all duration-300 hover:scale-[1.01] hover:shadow-lg hover:shadow-amber-500/25 active:scale-[0.99] disabled:cursor-wait disabled:opacity-75 disabled:hover:scale-100"
                   >
                     {submitting ? (
                       <>
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-950/30 border-t-zinc-950" />
                         {isRegister ? "Mendaftarkan…" : "Memverifikasi…"}
                       </>
                     ) : role === "ADMIN" ? (
@@ -486,7 +523,7 @@ export function LoginScreen({
 
                 {role === "PENGGUNA" && (
                   <div className="mt-5 border-t border-white/[0.06] pt-4 text-center">
-                    <p className="text-[11.5px] text-slate-500">
+                    <p className="text-[11.5px] text-zinc-500">
                       {isRegister ? (
                         <>
                           Sudah memiliki akun?{" "}
@@ -516,14 +553,14 @@ export function LoginScreen({
 
                 <div className="mt-4 flex items-center justify-center gap-2">
                   <Wifi className="h-3.5 w-3.5 text-emerald-400" />
-                  <p className="text-[10.5px] text-slate-500">
+                  <p className="text-[10.5px] text-zinc-500">
                     Akun & data tersimpan dengan aman
                   </p>
                 </div>
               </div>
             </div>
 
-            <p className="mt-6 text-center text-[10px] font-medium uppercase tracking-[0.18em] text-slate-600">
+            <p className="mt-6 text-center text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-600">
               © 2026 ST PUSBAYA · Banjar Campuan
             </p>
           </section>
