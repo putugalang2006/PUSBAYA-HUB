@@ -254,9 +254,9 @@ export function MembersView({
               </p>
             </div>
           </div>
-          <span className="badge badge-slate">
-            {isAdmin ? "Akses penuh" : "Mode baca"}
-          </span>
+          {isAdmin && (
+            <span className="badge badge-slate">Akses penuh</span>
+          )}
         </div>
 
         {members.length === 0 ? (
